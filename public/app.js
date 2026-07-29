@@ -75,6 +75,7 @@ const els = {
   journalFilterYear: document.querySelector("#journalFilterYear"),
   journalFilterLabel: document.querySelector("#journalFilterLabel"),
   resetJournalFiltersButton: document.querySelector("#resetJournalFiltersButton"),
+  removeOldDataButton: document.querySelector("#removeOldDataButton"),
 };
 
 function loadData() {
@@ -166,6 +167,10 @@ function readableDate(dateKey) {
 function parseDateKey(dateKey) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+function isDateKeyBefore(dateKey, cutoffDateKey) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) && dateKey < cutoffDateKey;
 }
 
 function addDays(date, days) {
@@ -408,6 +413,10 @@ function bindEvents() {
     renderJournal();
   });
 
+  els.removeOldDataButton.addEventListener("click", () => {
+    removeOldData();
+  });
+
 }
 
 function selectFirstVisibleDate() {
@@ -457,6 +466,67 @@ function renderAll() {
   renderCalendar();
   renderGoals();
   renderJournal();
+}
+
+function defaultCleanupDateKey() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - 1);
+  return toDateKey(date);
+}
+
+function removeOldData() {
+  const cutoffDate = window.prompt("Remove saved data before this date:", defaultCleanupDateKey());
+  if (!cutoffDate || !/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate)) return;
+
+  const confirmed = window.confirm(
+    `Remove journal entries, calendar tasks, day markers, and dated goals before ${cutoffDate}? This cannot be undone.`,
+  );
+  if (!confirmed) return;
+
+  const before = {
+    calendarDays: Object.keys(state.data.calendarNotes).length,
+    markerDays: Object.keys(state.data.dayEmojis).length,
+    journalEntries: state.data.journalEntries.length,
+    datedGoals: getGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
+  };
+
+  Object.keys(state.data.calendarNotes).forEach((dateKey) => {
+    if (isDateKeyBefore(dateKey, cutoffDate)) {
+      delete state.data.calendarNotes[dateKey];
+    }
+  });
+
+  Object.keys(state.data.dayEmojis).forEach((dateKey) => {
+    if (isDateKeyBefore(dateKey, cutoffDate)) {
+      delete state.data.dayEmojis[dateKey];
+    }
+  });
+
+  state.data.journalEntries = state.data.journalEntries.filter((entry) => !entry.date || !isDateKeyBefore(entry.date, cutoffDate));
+  getGoalSections().forEach((section) => {
+    section.goals = section.goals.filter((goal) => !goal.dueDate || !isDateKeyBefore(goal.dueDate, cutoffDate));
+  });
+
+  const after = {
+    calendarDays: Object.keys(state.data.calendarNotes).length,
+    markerDays: Object.keys(state.data.dayEmojis).length,
+    journalEntries: state.data.journalEntries.length,
+    datedGoals: getGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
+  };
+
+  saveData();
+  renderAll();
+
+  const removed =
+    before.calendarDays -
+    after.calendarDays +
+    before.markerDays -
+    after.markerDays +
+    before.journalEntries -
+    after.journalEntries +
+    before.datedGoals -
+    after.datedGoals;
+  window.alert(`Removed ${removed} old saved item${removed === 1 ? "" : "s"}.`);
 }
 
 function renderCalendar() {

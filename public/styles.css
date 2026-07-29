@@ -780,10 +780,11 @@ textarea:focus {
 .journal-filter-controls {
   display: grid;
   grid-template-columns:
-    minmax(170px, 1.2fr)
-    minmax(140px, 0.9fr)
-    minmax(120px, 0.75fr)
     minmax(150px, 1fr)
+    minmax(120px, 0.8fr)
+    minmax(105px, 0.7fr)
+    minmax(130px, 0.9fr)
+    auto
     auto;
   width: 100%;
 }
