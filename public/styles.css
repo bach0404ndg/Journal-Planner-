@@ -816,9 +816,9 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  color: var(--green);
-  font-size: clamp(0.92rem, 1.1vw, 1.05rem);
-  font-weight: 900;
+  color: rgba(22, 51, 33, 0.62);
+  font-size: 0.78rem;
+  font-weight: 650;
   line-height: 1.25;
 }
 
