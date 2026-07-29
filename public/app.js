@@ -996,26 +996,9 @@ function renderGoalItem(section, goal) {
   dateInput.type = "date";
   dateInput.value = goal.dueDate || state.selectedDate;
   dateInput.setAttribute("aria-label", "Goal calendar date");
-
-  const addDateButton = document.createElement("button");
-  addDateButton.type = "button";
-  addDateButton.textContent = goal.dueDate ? "Update date" : "Add date";
-  addDateButton.addEventListener("click", () => {
+  dateInput.addEventListener("change", () => {
     if (!dateInput.value) return;
     goal.dueDate = dateInput.value;
-    menu.open = false;
-    saveData();
-    renderGoals();
-    renderCalendar();
-    renderSelectedDateNotes();
-  });
-
-  const removeDateButton = document.createElement("button");
-  removeDateButton.type = "button";
-  removeDateButton.textContent = "Remove date";
-  removeDateButton.hidden = !goal.dueDate;
-  removeDateButton.addEventListener("click", () => {
-    goal.dueDate = "";
     menu.open = false;
     saveData();
     renderGoals();
@@ -1036,13 +1019,21 @@ function renderGoalItem(section, goal) {
     renderSelectedDateNotes();
   });
 
-  menuItems.append(dateInput, addDateButton, removeDateButton, deleteButton);
+  menuItems.append(dateInput, deleteButton);
   menu.append(summary, menuItems);
 
   const dateBadge = document.createElement("span");
   dateBadge.className = "goal-date-badge";
   dateBadge.textContent = goal.dueDate || "";
   dateBadge.hidden = !goal.dueDate;
+  dateBadge.title = "Double-click to remove date";
+  dateBadge.addEventListener("dblclick", () => {
+    goal.dueDate = "";
+    saveData();
+    renderGoals();
+    renderCalendar();
+    renderSelectedDateNotes();
+  });
 
   const textWrap = document.createElement("div");
   textWrap.className = "goal-text-wrap";
