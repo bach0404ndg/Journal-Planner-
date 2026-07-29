@@ -80,6 +80,8 @@ const els = {
   journalText: document.querySelector("#journalText"),
   journalSubmitButton: document.querySelector("#journalSubmitButton"),
   cancelJournalEditButton: document.querySelector("#cancelJournalEditButton"),
+  journalEntryToggle: document.querySelector("#journalEntryToggle"),
+  journalLayout: document.querySelector("#journalLayout"),
   journalLog: document.querySelector("#journalLog"),
   journalFilterDate: document.querySelector("#journalFilterDate"),
   journalFilterMonth: document.querySelector("#journalFilterMonth"),
@@ -100,6 +102,7 @@ function loadData() {
         journalLabels: normalizeJournalLabels(saved.journalLabels, saved.journalEntries),
         journalEntries: saved.journalEntries || [],
         palette: normalizePalette(saved.palette),
+        journalEntryCollapsed: Boolean(saved.journalEntryCollapsed),
       };
     }
   } catch (error) {
@@ -113,6 +116,7 @@ function loadData() {
     journalLabels: [...defaultJournalLabels],
     journalEntries: [],
     palette: "green",
+    journalEntryCollapsed: false,
   };
 }
 
@@ -177,6 +181,38 @@ function readableDate(dateKey) {
   });
 }
 
+function ordinalSuffix(day) {
+  if (day >= 11 && day <= 13) return "th";
+  const lastDigit = day % 10;
+  if (lastDigit === 1) return "st";
+  if (lastDigit === 2) return "nd";
+  if (lastDigit === 3) return "rd";
+  return "th";
+}
+
+function journalDateTitle(dateKey) {
+  if (!dateKey) return "Undated";
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) return "Undated";
+  const monthName = monthNames[month - 1];
+  return `${monthName} ${day}${ordinalSuffix(day)}, ${year}`;
+}
+
+function journalGroupTitle(group) {
+  const dateTitle = journalDateTitle(group.date);
+  if (group.location) return `${group.location}, ${dateTitle}`;
+  return dateTitle;
+}
+
+function journalTimeLabel(timeValue) {
+  if (!timeValue) return "No time";
+  const [hourValue, minuteValue] = timeValue.split(":").map(Number);
+  if (!Number.isFinite(hourValue) || !Number.isFinite(minuteValue)) return "No time";
+  const period = hourValue >= 12 ? "PM" : "AM";
+  const hour = hourValue % 12 || 12;
+  return `${hour}:${String(minuteValue).padStart(2, "0")} ${period}`;
+}
+
 function parseDateKey(dateKey) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -234,7 +270,7 @@ function init() {
     els.monthSelect.append(option);
   });
 
-  els.journalFilterMonth.append(makeOption("", "All months"));
+  els.journalFilterMonth.append(makeOption("", ""));
   monthNames.forEach((name, index) => {
     els.journalFilterMonth.append(makeOption(String(index + 1), name));
   });
@@ -254,6 +290,7 @@ function init() {
   els.journalDate.value = toDateKey(now);
   els.journalTime.value = now.toTimeString().slice(0, 5);
   renderPaletteOptions();
+  applyJournalLayout();
 
   bindEvents();
   ensureStarterSections();
@@ -309,6 +346,12 @@ function bindEvents() {
     state.data.palette = normalizePalette(els.paletteSelect.value);
     saveData();
     applyPalette();
+  });
+
+  els.journalEntryToggle.addEventListener("click", () => {
+    state.data.journalEntryCollapsed = !state.data.journalEntryCollapsed;
+    saveData();
+    applyJournalLayout();
   });
 
   els.tabs.forEach((tab) => {
@@ -374,6 +417,7 @@ function bindEvents() {
   });
 
   els.addJournalLabelButton.addEventListener("click", () => {
+    els.addJournalLabelButton.closest("details").open = false;
     const label = window.prompt("New journal label");
     if (!label) return;
     const clean = label.trim().slice(0, 32);
@@ -384,6 +428,7 @@ function bindEvents() {
   });
 
   els.removeJournalLabelButton.addEventListener("click", () => {
+    els.removeJournalLabelButton.closest("details").open = false;
     const label = els.journalLabel.value;
     if (!label) return;
     const confirmed = window.confirm(`Remove "${label}" from saved labels and journal entries?`);
@@ -456,6 +501,15 @@ function renderPaletteOptions() {
     els.paletteSelect.append(makeOption(palette.id, palette.name));
   });
   els.paletteSelect.value = normalizePalette(state.data.palette);
+}
+
+function applyJournalLayout() {
+  els.journalLayout.dataset.entryCollapsed = state.data.journalEntryCollapsed ? "true" : "false";
+  els.journalEntryToggle.textContent = state.data.journalEntryCollapsed ? "›" : "‹";
+  els.journalEntryToggle.setAttribute(
+    "aria-label",
+    state.data.journalEntryCollapsed ? "Open entry box" : "Close entry box",
+  );
 }
 
 function selectFirstVisibleDate() {
@@ -841,8 +895,8 @@ function renderJournalLabelOptions(selectedLabel = els.journalLabel.value) {
   els.journalLabel.innerHTML = "";
   els.journalFilterLabel.innerHTML = "";
 
-  els.journalLabel.append(makeOption("", "Choose label"));
-  els.journalFilterLabel.append(makeOption("", "All labels"));
+  els.journalLabel.append(makeOption("", ""));
+  els.journalFilterLabel.append(makeOption("", ""));
 
   labels.forEach((label) => {
     els.journalLabel.append(makeOption(label, label));
@@ -1115,7 +1169,7 @@ function renderJournal() {
 
     const meta = document.createElement("div");
     meta.className = "entry-meta";
-    meta.textContent = `${group.location} / ${group.date}`;
+    meta.textContent = journalGroupTitle(group);
 
     head.append(meta);
     article.append(head);
@@ -1129,7 +1183,7 @@ function renderJournal() {
 
       const time = document.createElement("div");
       time.className = "entry-time";
-      time.textContent = entry.time || "No time";
+      time.textContent = journalTimeLabel(entry.time);
 
       const menu = makeJournalEntryMenu(entry);
       entryHead.append(time, menu);
@@ -1159,8 +1213,8 @@ function groupJournalEntries(entries) {
   const groups = new Map();
 
   entries.forEach((entry) => {
-    const location = entry.city || "No city";
-    const date = entry.date || "No date";
+    const location = entry.city || "";
+    const date = entry.date || "";
     const key = `${location}\u0000${date}`;
     if (!groups.has(key)) {
       groups.set(key, { location, date, entries: [] });
