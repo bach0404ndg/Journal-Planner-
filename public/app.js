@@ -144,6 +144,7 @@ function normalizeGoalSections(savedSections) {
             id: goal.id || makeId("goal"),
             text: goal.text || "",
             done: Boolean(goal.done),
+            dueDate: goal.dueDate || "",
           });
         });
       });
@@ -504,6 +505,7 @@ function renderCalendar() {
     notes.className = "cell-notes";
     const dayNotes = state.data.calendarNotes[dateKey] || [];
     dayNotes.forEach((note) => notes.append(makeCalendarTask(note, dateKey)));
+    getGoalsForDate(dateKey).forEach((goalMatch) => notes.append(makeCalendarGoalTask(goalMatch, "calendar")));
 
     cell.append(notes);
     els.calendarGrid.append(cell);
@@ -571,6 +573,63 @@ function toggleDayEmoji(emoji) {
 
 function makeCalendarTask(note, dateKey) {
   return makeTaskRow(note, dateKey, "calendar");
+}
+
+function getGoalsForDate(dateKey) {
+  return getGoalSections().flatMap((section) =>
+    section.goals.filter((goal) => goal.dueDate === dateKey).map((goal) => ({ section, goal })),
+  );
+}
+
+function makeCalendarGoalTask(goalMatch, variant) {
+  const { goal } = goalMatch;
+  const task = document.createElement("div");
+  task.className = variant === "calendar" ? "note-pill calendar-task calendar-goal-task" : "mini-item calendar-task calendar-goal-task";
+  task.classList.toggle("is-done", Boolean(goal.done));
+  task.addEventListener("click", (event) => event.stopPropagation());
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = Boolean(goal.done);
+  checkbox.setAttribute("aria-label", "Mark goal complete");
+  checkbox.addEventListener("change", () => {
+    goal.done = checkbox.checked;
+    saveData();
+    renderCalendar();
+    renderSelectedDateNotes();
+    renderGoals();
+  });
+
+  const input = document.createElement("input");
+  input.className = "task-text-input";
+  input.type = "text";
+  input.value = goal.text;
+  input.setAttribute("aria-label", "Edit dated goal");
+  input.addEventListener("change", () => {
+    const nextText = input.value.trim();
+    if (!nextText) {
+      goalMatch.section.goals = goalMatch.section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
+    } else {
+      goal.text = nextText;
+    }
+    saveData();
+    renderCalendar();
+    renderSelectedDateNotes();
+    renderGoals();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      input.blur();
+    }
+  });
+
+  const source = document.createElement("span");
+  source.className = "goal-source-label";
+  source.textContent = "Goal";
+
+  task.append(checkbox, input, source);
+  return task;
 }
 
 function deleteCalendarTask(dateKey, noteId) {
@@ -651,12 +710,11 @@ function renderSelectedDateNotes() {
   els.selectedDateNotes.innerHTML = "";
   const notes = state.data.calendarNotes[state.selectedDate] || [];
 
-  if (!notes.length) {
-    return;
-  }
-
   notes.forEach((note) => {
     els.selectedDateNotes.append(makeTaskRow(note, state.selectedDate, "selected"));
+  });
+  getGoalsForDate(state.selectedDate).forEach((goalMatch) => {
+    els.selectedDateNotes.append(makeCalendarGoalTask(goalMatch, "selected"));
   });
 }
 
@@ -794,10 +852,11 @@ function renderGoals() {
       event.preventDefault();
       const text = goalInput.value.trim();
       if (!text) return;
-      section.goals.push({ id: makeId("goal"), text, done: false });
+      section.goals.push({ id: makeId("goal"), text, done: false, dueDate: "" });
       goalInput.value = "";
       saveData();
       renderGoals();
+      renderCalendar();
     });
 
     if (section.goals.length) {
@@ -821,6 +880,7 @@ function renderGoalItem(section, goal) {
     goal.done = checkbox.checked;
     saveData();
     renderGoals();
+    renderCalendar();
   });
 
   const text = document.createElement("input");
@@ -837,6 +897,7 @@ function renderGoalItem(section, goal) {
     }
     saveData();
     renderGoals();
+    renderCalendar();
   });
   text.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -845,18 +906,74 @@ function renderGoalItem(section, goal) {
     }
   });
 
-  const deleteButton = document.createElement("button");
-  deleteButton.className = "quiet-delete-button";
-  deleteButton.type = "button";
-  deleteButton.textContent = "x";
-  deleteButton.setAttribute("aria-label", "Delete goal");
-  deleteButton.addEventListener("click", () => {
-    section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
+  const menu = document.createElement("details");
+  menu.className = "entry-menu goal-item-menu";
+
+  const summary = document.createElement("summary");
+  summary.setAttribute("aria-label", "Goal options");
+  summary.textContent = "...";
+
+  const menuItems = document.createElement("div");
+  menuItems.className = "entry-menu-items goal-menu-items";
+
+  const dateInput = document.createElement("input");
+  dateInput.className = "goal-date-input";
+  dateInput.type = "date";
+  dateInput.value = goal.dueDate || state.selectedDate;
+  dateInput.setAttribute("aria-label", "Goal calendar date");
+
+  const addDateButton = document.createElement("button");
+  addDateButton.type = "button";
+  addDateButton.textContent = goal.dueDate ? "Update date" : "Add date";
+  addDateButton.addEventListener("click", () => {
+    if (!dateInput.value) return;
+    goal.dueDate = dateInput.value;
+    menu.open = false;
     saveData();
     renderGoals();
+    renderCalendar();
+    renderSelectedDateNotes();
   });
 
-  item.append(checkbox, text, deleteButton);
+  const removeDateButton = document.createElement("button");
+  removeDateButton.type = "button";
+  removeDateButton.textContent = "Remove date";
+  removeDateButton.hidden = !goal.dueDate;
+  removeDateButton.addEventListener("click", () => {
+    goal.dueDate = "";
+    menu.open = false;
+    saveData();
+    renderGoals();
+    renderCalendar();
+    renderSelectedDateNotes();
+  });
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.textContent = "Delete";
+  deleteButton.className = "danger-text";
+  deleteButton.addEventListener("click", () => {
+    section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
+    menu.open = false;
+    saveData();
+    renderGoals();
+    renderCalendar();
+    renderSelectedDateNotes();
+  });
+
+  menuItems.append(dateInput, addDateButton, removeDateButton, deleteButton);
+  menu.append(summary, menuItems);
+
+  const dateBadge = document.createElement("span");
+  dateBadge.className = "goal-date-badge";
+  dateBadge.textContent = goal.dueDate || "";
+  dateBadge.hidden = !goal.dueDate;
+
+  const textWrap = document.createElement("div");
+  textWrap.className = "goal-text-wrap";
+  textWrap.append(text, dateBadge);
+
+  item.append(checkbox, textWrap, menu);
   return item;
 }
 
