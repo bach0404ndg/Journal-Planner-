@@ -428,6 +428,16 @@ function selectFirstVisibleDate() {
   state.selectedDate = `${state.year}-${String(state.month + 1).padStart(2, "0")}-01`;
 }
 
+function setCalendarDate(dateKey) {
+  const nextDate = parseDateKey(dateKey);
+  state.selectedDate = dateKey;
+  state.month = nextDate.getMonth();
+  state.year = nextDate.getFullYear();
+  els.selectedDateInput.value = state.selectedDate;
+  els.monthSelect.value = state.month;
+  els.yearInput.value = state.year;
+}
+
 function ensureStarterSections() {
   if (state.data.goalSections.length) return;
 
@@ -994,11 +1004,12 @@ function renderGoalItem(section, goal) {
   const dateInput = document.createElement("input");
   dateInput.className = "goal-date-input";
   dateInput.type = "date";
-  dateInput.value = goal.dueDate || state.selectedDate;
+  dateInput.value = goal.dueDate || "";
   dateInput.setAttribute("aria-label", "Goal calendar date");
   dateInput.addEventListener("change", () => {
     if (!dateInput.value) return;
     goal.dueDate = dateInput.value;
+    setCalendarDate(goal.dueDate);
     menu.open = false;
     saveData();
     renderGoals();

@@ -734,6 +734,20 @@ textarea:focus {
 
 .goal-item-menu {
   align-self: start;
+  cursor: default;
+}
+
+.goal-item-menu,
+.goal-item-menu * {
+  cursor: auto;
+}
+
+.goal-item-menu summary {
+  width: 25px;
+  height: 24px;
+  min-height: 24px;
+  font-size: 0.72rem;
+  cursor: pointer;
 }
 
 .goal-menu-items {
