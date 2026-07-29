@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name journal-project"
+  },
+  "devDependencies": {
+    "wrangler": "^4.115.0"
+  }
+}

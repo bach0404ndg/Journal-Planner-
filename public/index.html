@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Monthly Planner Journal</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Planner</p>
+        </div>
+      </header>
+
+      <nav class="tabs" aria-label="Planner sections">
+        <button class="tab is-active" type="button" data-view="calendar">Calendar</button>
+        <button class="tab" type="button" data-view="goals">Goals</button>
+        <button class="tab" type="button" data-view="journal">Journal</button>
+      </nav>
+
+      <section class="view is-active" id="calendarView" aria-label="Calendar">
+        <div class="section-head">
+          <div class="calendar-actions" aria-label="Calendar controls">
+            <div class="range-switch" aria-label="Calendar range">
+              <button class="range-button" type="button" data-range="four">4 weeks</button>
+              <button class="range-button is-active" type="button" data-range="week">1 week</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="calendar-layout">
+          <aside class="side-panel" aria-label="Calendar task editor">
+            <div class="calendar-date-controls" aria-label="Calendar date controls">
+              <label>
+                <span>Date</span>
+                <input id="selectedDateInput" type="date">
+              </label>
+              <label>
+                <span>Month</span>
+                <select id="monthSelect"></select>
+              </label>
+              <label>
+                <span>Year</span>
+                <input id="yearInput" type="number" min="1970" max="2099" inputmode="numeric">
+              </label>
+              <button class="ghost-button" type="button" id="todayButton">Today</button>
+            </div>
+            <h3 id="selectedDateLabel">Choose a date</h3>
+            <div class="emoji-section" aria-label="Day emoji markers">
+              <p class="panel-label">Day markers</p>
+              <div class="emoji-palette" id="emojiPalette"></div>
+            </div>
+            <form id="calendarNoteForm" class="stacked-form">
+              <label>
+                <span>Task</span>
+                <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+              </label>
+            </form>
+            <div class="mini-list" id="selectedDateNotes"></div>
+          </aside>
+
+          <section class="calendar-panel" aria-label="Monthly calendar">
+            <div class="weekday-row" id="weekdayRow"></div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="goalsView" aria-label="Goals">
+        <div class="goals-layout">
+          <section class="quick-add-panel" aria-label="Add goal section">
+            <form id="sectionForm" class="inline-form">
+              <label>
+                <span>Section name</span>
+                <input id="sectionNameInput" type="text" placeholder="New section name and press Enter">
+              </label>
+            </form>
+          </section>
+          <div class="goal-sections" id="goalSections"></div>
+        </div>
+      </section>
+
+      <section class="view" id="journalView" aria-label="Journal and gratefulness">
+        <div class="journal-layout">
+          <form id="journalForm" class="journal-form" aria-label="New journal entry">
+            <div class="journal-meta">
+              <label>
+                <span>City</span>
+                <input id="journalCity" type="text" placeholder="Hanoi">
+              </label>
+              <label>
+                <span>Date</span>
+                <input id="journalDate" type="date">
+              </label>
+              <label>
+                <span>Time</span>
+                <input id="journalTime" type="time">
+              </label>
+            </div>
+            <div class="journal-label-row">
+              <label>
+                <span>Label</span>
+                <select id="journalLabel"></select>
+              </label>
+              <button class="ghost-button" id="addJournalLabelButton" type="button">+ Label</button>
+              <button class="ghost-button danger-soft" id="removeJournalLabelButton" type="button">Remove</button>
+            </div>
+            <label>
+              <span>Entry</span>
+              <textarea id="journalText" rows="10" placeholder="Write whatever you want to remember, plus anything you are grateful for."></textarea>
+            </label>
+            <div class="journal-form-actions">
+              <button class="primary-button" id="journalSubmitButton" type="submit">Save entry</button>
+              <button class="ghost-button" id="cancelJournalEditButton" type="button" hidden>Cancel edit</button>
+            </div>
+          </form>
+
+          <aside class="log-panel" aria-label="Saved journal entries">
+            <div class="log-head">
+              <div class="journal-filter-controls">
+                <label>
+                  <span>Date</span>
+                  <input id="journalFilterDate" type="date">
+                </label>
+                <label>
+                  <span>Label</span>
+                  <select id="journalFilterLabel"></select>
+                </label>
+                <button class="ghost-button" type="button" id="resetJournalFiltersButton">Reset</button>
+              </div>
+            </div>
+            <div class="journal-log" id="journalLog"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <template id="goalSectionTemplate">
+      <article class="goal-section">
+        <header>
+          <input class="section-title-input" type="text" aria-label="Goal section title">
+          <button class="icon-button danger" type="button" data-action="delete-section" aria-label="Delete section">x</button>
+        </header>
+        <form class="goal-form">
+          <input type="text" placeholder="Add a goal and press Enter">
+        </form>
+        <ul class="goal-list"></ul>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
