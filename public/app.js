@@ -36,6 +36,7 @@ const state = {
   selectedDate: toDateKey(new Date()),
   range: "week",
   editingJournalId: null,
+  draggingGoalSectionId: null,
   journalFilters: { date: "", label: "" },
   data: loadData(),
 };
@@ -384,6 +385,20 @@ function addGoalSection(title) {
   renderGoals();
 }
 
+function moveGoalSection(draggedId, targetId) {
+  if (!draggedId || !targetId || draggedId === targetId) return;
+
+  const sections = getMonthSections();
+  const fromIndex = sections.findIndex((section) => section.id === draggedId);
+  const toIndex = sections.findIndex((section) => section.id === targetId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  const [movedSection] = sections.splice(fromIndex, 1);
+  sections.splice(toIndex, 0, movedSection);
+  saveData();
+  renderGoals();
+}
+
 function renderAll() {
   ensureStarterSections();
   renderCalendar();
@@ -670,12 +685,39 @@ function renderGoals() {
     const fragment = els.goalSectionTemplate.content.cloneNode(true);
     const card = fragment.querySelector(".goal-section");
     const titleInput = fragment.querySelector(".section-title-input");
+    const dragHandle = fragment.querySelector("[data-action='move-section']");
     const deleteSectionButton = fragment.querySelector("[data-action='delete-section']");
     const goalForm = fragment.querySelector(".goal-form");
     const goalInput = goalForm.querySelector("input");
     const goalList = fragment.querySelector(".goal-list");
 
+    card.dataset.sectionId = section.id;
     titleInput.value = section.title;
+    dragHandle.addEventListener("dragstart", (event) => {
+      state.draggingGoalSectionId = section.id;
+      card.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", section.id);
+    });
+    dragHandle.addEventListener("dragend", () => {
+      state.draggingGoalSectionId = null;
+      card.classList.remove("is-dragging");
+      els.goalSections.querySelectorAll(".is-drop-target").forEach((item) => item.classList.remove("is-drop-target"));
+    });
+    card.addEventListener("dragover", (event) => {
+      if (!state.draggingGoalSectionId || state.draggingGoalSectionId === section.id) return;
+      event.preventDefault();
+      card.classList.add("is-drop-target");
+    });
+    card.addEventListener("dragleave", () => {
+      card.classList.remove("is-drop-target");
+    });
+    card.addEventListener("drop", (event) => {
+      event.preventDefault();
+      card.classList.remove("is-drop-target");
+      moveGoalSection(event.dataTransfer.getData("text/plain") || state.draggingGoalSectionId, section.id);
+    });
+
     titleInput.addEventListener("change", () => {
       section.title = titleInput.value.trim() || "Untitled";
       saveData();
