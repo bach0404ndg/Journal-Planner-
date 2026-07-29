@@ -37,7 +37,7 @@ const state = {
   range: "week",
   editingJournalId: null,
   draggingGoalSectionId: null,
-  journalFilters: { date: "", label: "" },
+  journalFilters: { date: "", month: "", year: "", label: "" },
   data: loadData(),
 };
 
@@ -71,6 +71,8 @@ const els = {
   cancelJournalEditButton: document.querySelector("#cancelJournalEditButton"),
   journalLog: document.querySelector("#journalLog"),
   journalFilterDate: document.querySelector("#journalFilterDate"),
+  journalFilterMonth: document.querySelector("#journalFilterMonth"),
+  journalFilterYear: document.querySelector("#journalFilterYear"),
   journalFilterLabel: document.querySelector("#journalFilterLabel"),
   resetJournalFiltersButton: document.querySelector("#resetJournalFiltersButton"),
 };
@@ -82,7 +84,7 @@ function loadData() {
       return {
         calendarNotes: saved.calendarNotes || {},
         dayEmojis: saved.dayEmojis || {},
-        goalSections: saved.goalSections || {},
+        goalSections: normalizeGoalSections(saved.goalSections),
         journalLabels: normalizeJournalLabels(saved.journalLabels, saved.journalEntries),
         journalEntries: saved.journalEntries || [],
       };
@@ -94,7 +96,7 @@ function loadData() {
   return {
     calendarNotes: {},
     dayEmojis: {},
-    goalSections: {},
+    goalSections: [],
     journalLabels: [...defaultJournalLabels],
     journalEntries: [],
   };
@@ -111,8 +113,43 @@ function toDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-function monthKey() {
-  return `${state.year}-${String(state.month + 1).padStart(2, "0")}`;
+function normalizeGoalSections(savedSections) {
+  if (Array.isArray(savedSections)) {
+    return savedSections;
+  }
+
+  if (!savedSections || typeof savedSections !== "object") {
+    return [];
+  }
+
+  const mergedSections = new Map();
+  Object.keys(savedSections)
+    .sort()
+    .forEach((key) => {
+      const sections = Array.isArray(savedSections[key]) ? savedSections[key] : [];
+      sections.forEach((section) => {
+        const title = section.title || "Untitled";
+        if (!mergedSections.has(title)) {
+          mergedSections.set(title, {
+            id: section.id || makeId("section"),
+            title,
+            goals: [],
+          });
+        }
+
+        const targetSection = mergedSections.get(title);
+        const goals = Array.isArray(section.goals) ? section.goals : [];
+        goals.forEach((goal) => {
+          targetSection.goals.push({
+            id: goal.id || makeId("goal"),
+            text: goal.text || "",
+            done: Boolean(goal.done),
+          });
+        });
+      });
+    });
+
+  return [...mergedSections.values()];
 }
 
 function readableDate(dateKey) {
@@ -172,6 +209,11 @@ function init() {
     els.monthSelect.append(option);
   });
 
+  els.journalFilterMonth.append(makeOption("", "All months"));
+  monthNames.forEach((name, index) => {
+    els.journalFilterMonth.append(makeOption(String(index + 1), name));
+  });
+
   weekdayNames.forEach((name) => {
     const day = document.createElement("div");
     day.className = "weekday";
@@ -197,7 +239,7 @@ function bindEvents() {
   els.monthSelect.addEventListener("change", () => {
     state.month = Number(els.monthSelect.value);
     selectFirstVisibleDate();
-    renderAll();
+    renderCalendar();
   });
 
   els.selectedDateInput.addEventListener("change", () => {
@@ -208,7 +250,7 @@ function bindEvents() {
     state.year = nextDate.getFullYear();
     els.monthSelect.value = state.month;
     els.yearInput.value = state.year;
-    renderAll();
+    renderCalendar();
   });
 
   els.yearInput.addEventListener("change", () => {
@@ -216,7 +258,7 @@ function bindEvents() {
     state.year = Number.isFinite(nextYear) ? nextYear : new Date().getFullYear();
     els.yearInput.value = state.year;
     selectFirstVisibleDate();
-    renderAll();
+    renderCalendar();
   });
 
   els.rangeButtons.forEach((button) => {
@@ -236,7 +278,7 @@ function bindEvents() {
     els.monthSelect.value = state.month;
     els.yearInput.value = state.year;
     els.rangeButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.range === "week"));
-    renderAll();
+    renderCalendar();
   });
 
   els.tabs.forEach((tab) => {
@@ -341,14 +383,26 @@ function bindEvents() {
     renderJournal();
   });
 
+  els.journalFilterMonth.addEventListener("change", () => {
+    state.journalFilters.month = els.journalFilterMonth.value;
+    renderJournal();
+  });
+
+  els.journalFilterYear.addEventListener("change", () => {
+    state.journalFilters.year = els.journalFilterYear.value.trim();
+    renderJournal();
+  });
+
   els.journalFilterLabel.addEventListener("change", () => {
     state.journalFilters.label = els.journalFilterLabel.value;
     renderJournal();
   });
 
   els.resetJournalFiltersButton.addEventListener("click", () => {
-    state.journalFilters = { date: "", label: "" };
+    state.journalFilters = { date: "", month: "", year: "", label: "" };
     els.journalFilterDate.value = "";
+    els.journalFilterMonth.value = "";
+    els.journalFilterYear.value = "";
     els.journalFilterLabel.value = "";
     renderJournal();
   });
@@ -360,10 +414,9 @@ function selectFirstVisibleDate() {
 }
 
 function ensureStarterSections() {
-  const key = monthKey();
-  if (state.data.goalSections[key]?.length) return;
+  if (state.data.goalSections.length) return;
 
-  state.data.goalSections[key] = [
+  state.data.goalSections = [
     { id: makeId("section"), title: "Priorities", goals: [] },
     { id: makeId("section"), title: "Optional goals", goals: [] },
     { id: makeId("section"), title: "Personal", goals: [] },
@@ -371,16 +424,15 @@ function ensureStarterSections() {
   saveData();
 }
 
-function getMonthSections() {
-  const key = monthKey();
-  if (!state.data.goalSections[key]) {
-    state.data.goalSections[key] = [];
+function getGoalSections() {
+  if (!Array.isArray(state.data.goalSections)) {
+    state.data.goalSections = [];
   }
-  return state.data.goalSections[key];
+  return state.data.goalSections;
 }
 
 function addGoalSection(title) {
-  getMonthSections().push({ id: makeId("section"), title, goals: [] });
+  getGoalSections().push({ id: makeId("section"), title, goals: [] });
   saveData();
   renderGoals();
 }
@@ -388,7 +440,7 @@ function addGoalSection(title) {
 function moveGoalSection(draggedId, targetId) {
   if (!draggedId || !targetId || draggedId === targetId) return;
 
-  const sections = getMonthSections();
+  const sections = getGoalSections();
   const fromIndex = sections.findIndex((section) => section.id === draggedId);
   const toIndex = sections.findIndex((section) => section.id === targetId);
   if (fromIndex === -1 || toIndex === -1) return;
@@ -667,17 +719,21 @@ function deleteJournalEntry(entryId) {
 function filteredJournalEntries() {
   return state.data.journalEntries.filter((entry) => {
     const dateMatches = !state.journalFilters.date || entry.date === state.journalFilters.date;
+    const entryDate = entry.date ? parseDateKey(entry.date) : null;
+    const monthMatches =
+      !state.journalFilters.month || (entryDate && String(entryDate.getMonth() + 1) === state.journalFilters.month);
+    const yearMatches = !state.journalFilters.year || (entryDate && String(entryDate.getFullYear()) === state.journalFilters.year);
     const labelMatches = !state.journalFilters.label || getEntryLabel(entry) === state.journalFilters.label;
-    return dateMatches && labelMatches;
+    return dateMatches && monthMatches && yearMatches && labelMatches;
   });
 }
 
 function renderGoals() {
   els.goalSections.innerHTML = "";
-  const sections = getMonthSections();
+  const sections = getGoalSections();
 
   if (!sections.length) {
-    els.goalSections.append(emptyState("Add a section for this month."));
+    els.goalSections.append(emptyState("Add a section."));
     return;
   }
 
@@ -721,15 +777,12 @@ function renderGoals() {
     titleInput.addEventListener("change", () => {
       section.title = titleInput.value.trim() || "Untitled";
       saveData();
-      renderCalendar();
     });
 
     deleteSectionButton.addEventListener("click", () => {
-      const key = monthKey();
-      state.data.goalSections[key] = sections.filter((item) => item.id !== section.id);
+      state.data.goalSections = sections.filter((item) => item.id !== section.id);
       saveData();
       renderGoals();
-      renderCalendar();
     });
 
     goalForm.addEventListener("submit", (event) => {
@@ -740,7 +793,6 @@ function renderGoals() {
       goalInput.value = "";
       saveData();
       renderGoals();
-      renderCalendar();
     });
 
     if (section.goals.length) {
@@ -780,7 +832,6 @@ function renderGoalItem(section, goal) {
     }
     saveData();
     renderGoals();
-    renderCalendar();
   });
   text.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
@@ -798,7 +849,6 @@ function renderGoalItem(section, goal) {
     section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
     saveData();
     renderGoals();
-    renderCalendar();
   });
 
   item.append(checkbox, text, deleteButton);
@@ -809,6 +859,8 @@ function renderJournal() {
   els.journalLog.innerHTML = "";
   renderJournalLabelOptions();
   els.journalFilterDate.value = state.journalFilters.date;
+  els.journalFilterMonth.value = state.journalFilters.month;
+  els.journalFilterYear.value = state.journalFilters.year;
   const entries = filteredJournalEntries();
 
   if (!state.data.journalEntries.length) {
