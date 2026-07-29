@@ -54,8 +54,8 @@ button {
 }
 
 .topbar {
-  min-height: 104px;
-  padding: 22px 0 28px;
+  min-height: 58px;
+  padding: 10px 0 14px;
   border-bottom: 1px solid rgba(22, 51, 33, 0.24);
 }
 
@@ -77,12 +77,13 @@ h3 {
 }
 
 h1 {
-  max-width: 780px;
+  max-width: 100%;
   font-family: Georgia, "Times New Roman", serif;
   color: var(--green);
-  font-size: clamp(2.7rem, 6vw, 5.8rem);
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
   font-weight: 900;
-  line-height: 0.98;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 h2 {
