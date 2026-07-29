@@ -23,9 +23,9 @@ const paletteOptions = [
   { id: "green", name: "Green", color: "#08742b" },
   { id: "yellow", name: "Yellow", color: "#d99a14" },
   { id: "coral", name: "Coral", color: "#d45b4c" },
-  { id: "blue", name: "Blue", color: "#2563eb" },
+  { id: "olive", name: "Olive", color: "#6f7d35" },
   { id: "rose", name: "Rose", color: "#be3a5b" },
-  { id: "plum", name: "Plum", color: "#7c3aed" },
+  { id: "brick", name: "Brick", color: "#9f4f37" },
 ];
 
 const emojiOptions = [
@@ -926,6 +926,7 @@ function resetJournalForm() {
 }
 
 function startJournalEdit(entry) {
+  state.data.journalEntryCollapsed = false;
   state.editingJournalId = entry.id;
   els.journalCity.value = entry.city || "";
   els.journalDate.value = entry.date || toDateKey(new Date());
@@ -934,6 +935,8 @@ function startJournalEdit(entry) {
   els.journalText.value = entry.text || "";
   els.journalSubmitButton.textContent = "Update entry";
   els.cancelJournalEditButton.hidden = false;
+  saveData();
+  applyJournalLayout();
   window.scrollTo({ top: els.journalForm.offsetTop - 24, behavior: "smooth" });
 }
 
@@ -1185,9 +1188,9 @@ function renderJournal() {
       time.className = "entry-time";
       time.textContent = journalTimeLabel(entry.time);
 
-      const menu = makeJournalEntryMenu(entry);
-      entryHead.append(time, menu);
-      entryBlock.append(entryHead);
+      const timeLine = document.createElement("div");
+      timeLine.className = "entry-time-line";
+      timeLine.append(time);
 
       const label = getEntryLabel(entry);
       if (label) {
@@ -1196,8 +1199,12 @@ function renderJournal() {
         const tagPill = document.createElement("span");
         tagPill.textContent = label;
         labels.append(tagPill);
-        entryBlock.append(labels);
+        timeLine.append(labels);
       }
+
+      const menu = makeJournalEntryMenu(entry);
+      entryHead.append(timeLine, menu);
+      entryBlock.append(entryHead);
 
       const text = document.createElement("p");
       text.textContent = entry.text;
