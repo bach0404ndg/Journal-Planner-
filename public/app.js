@@ -19,6 +19,15 @@ const weekdayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const defaultJournalLabels = ["Grateful", "Idea", "Memory", "Reflection"];
 
+const paletteOptions = [
+  { id: "green", name: "Green", color: "#08742b" },
+  { id: "yellow", name: "Yellow", color: "#d99a14" },
+  { id: "coral", name: "Coral", color: "#d45b4c" },
+  { id: "blue", name: "Blue", color: "#2563eb" },
+  { id: "rose", name: "Rose", color: "#be3a5b" },
+  { id: "plum", name: "Plum", color: "#7c3aed" },
+];
+
 const emojiOptions = [
   { emoji: "⭐", label: "Star" },
   { emoji: "🔥", label: "Fire" },
@@ -51,6 +60,7 @@ const els = {
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
   emojiPalette: document.querySelector("#emojiPalette"),
+  paletteSelect: document.querySelector("#paletteSelect"),
   selectedDateNotes: document.querySelector("#selectedDateNotes"),
   todayButton: document.querySelector("#todayButton"),
   rangeButtons: document.querySelectorAll(".range-button"),
@@ -89,6 +99,7 @@ function loadData() {
         goalSections: normalizeGoalSections(saved.goalSections),
         journalLabels: normalizeJournalLabels(saved.journalLabels, saved.journalEntries),
         journalEntries: saved.journalEntries || [],
+        palette: normalizePalette(saved.palette),
       };
     }
   } catch (error) {
@@ -101,6 +112,7 @@ function loadData() {
     goalSections: [],
     journalLabels: [...defaultJournalLabels],
     journalEntries: [],
+    palette: "green",
   };
 }
 
@@ -190,6 +202,10 @@ function normalizeJournalLabels(savedLabels, entries = []) {
   return [...new Set([...labels, ...entryLabels])].sort((a, b) => a.localeCompare(b));
 }
 
+function normalizePalette(savedPalette) {
+  return paletteOptions.some((palette) => palette.id === savedPalette) ? savedPalette : "green";
+}
+
 function getEntryLabel(entry) {
   if (entry.label) return entry.label;
   if (Array.isArray(entry.tags) && entry.tags.length) return entry.tags[0];
@@ -209,6 +225,8 @@ function makeId(prefix) {
 }
 
 function init() {
+  applyPalette();
+
   monthNames.forEach((name, index) => {
     const option = document.createElement("option");
     option.value = index;
@@ -235,6 +253,7 @@ function init() {
   const now = new Date();
   els.journalDate.value = toDateKey(now);
   els.journalTime.value = now.toTimeString().slice(0, 5);
+  renderPaletteOptions();
 
   bindEvents();
   ensureStarterSections();
@@ -278,14 +297,18 @@ function bindEvents() {
 
   els.todayButton.addEventListener("click", () => {
     const today = new Date();
-      state.month = today.getMonth();
-      state.year = today.getFullYear();
-      state.selectedDate = toDateKey(today);
-    state.range = "week";
+    state.month = today.getMonth();
+    state.year = today.getFullYear();
+    state.selectedDate = toDateKey(today);
     els.monthSelect.value = state.month;
     els.yearInput.value = state.year;
-    els.rangeButtons.forEach((item) => item.classList.toggle("is-active", item.dataset.range === "week"));
     renderCalendar();
+  });
+
+  els.paletteSelect.addEventListener("change", () => {
+    state.data.palette = normalizePalette(els.paletteSelect.value);
+    saveData();
+    applyPalette();
   });
 
   els.tabs.forEach((tab) => {
@@ -421,7 +444,18 @@ function bindEvents() {
   els.removeOldDataButton.addEventListener("click", () => {
     removeOldData();
   });
+}
 
+function applyPalette() {
+  document.documentElement.dataset.palette = normalizePalette(state.data.palette);
+}
+
+function renderPaletteOptions() {
+  els.paletteSelect.innerHTML = "";
+  paletteOptions.forEach((palette) => {
+    els.paletteSelect.append(makeOption(palette.id, palette.name));
+  });
+  els.paletteSelect.value = normalizePalette(state.data.palette);
 }
 
 function selectFirstVisibleDate() {
@@ -546,10 +580,8 @@ function removeOldData() {
 
 function renderCalendar() {
   const selectedDate = parseDateKey(state.selectedDate);
-  const firstOfMonth = new Date(state.year, state.month, 1);
-  const gridStart = state.range === "week" ? startOfWeek(selectedDate) : startOfWeek(firstOfMonth);
+  const gridStart = startOfWeek(selectedDate);
   const totalDays = state.range === "week" ? 7 : 28;
-  const gridEnd = addDays(gridStart, totalDays - 1);
   els.calendarGrid.innerHTML = "";
   els.calendarGrid.classList.toggle("is-week-view", state.range === "week");
 
@@ -613,6 +645,7 @@ function makeDayEmojiMarks(dateKey) {
 
   emojis.forEach((emoji) => {
     const mark = document.createElement("span");
+    mark.className = "day-emoji-mark";
     mark.textContent = emoji;
     wrapper.append(mark);
   });
@@ -883,6 +916,7 @@ function renderGoals() {
   sections.forEach((section) => {
     const fragment = els.goalSectionTemplate.content.cloneNode(true);
     const card = fragment.querySelector(".goal-section");
+    const sectionHeader = fragment.querySelector("header");
     const titleInput = fragment.querySelector(".section-title-input");
     const deleteSectionButton = fragment.querySelector("[data-action='delete-section']");
     const goalForm = fragment.querySelector(".goal-form");
@@ -890,9 +924,9 @@ function renderGoals() {
     const goalList = fragment.querySelector(".goal-list");
 
     card.dataset.sectionId = section.id;
-    card.draggable = true;
+    sectionHeader.draggable = true;
     titleInput.value = section.title;
-    card.addEventListener("dragstart", (event) => {
+    sectionHeader.addEventListener("dragstart", (event) => {
       if (event.target.closest("input, button, select, textarea")) {
         event.preventDefault();
         return;
@@ -903,7 +937,7 @@ function renderGoals() {
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", section.id);
     });
-    card.addEventListener("dragend", () => {
+    sectionHeader.addEventListener("dragend", () => {
       state.draggingGoalSectionId = null;
       card.classList.remove("is-dragging");
       els.goalSections.querySelectorAll(".is-drop-target").forEach((item) => item.classList.remove("is-drop-target"));
@@ -1072,7 +1106,7 @@ function renderJournal() {
     return;
   }
 
-  entries.forEach((entry) => {
+  groupJournalEntries(entries).forEach((group) => {
     const article = document.createElement("article");
     article.className = "journal-entry";
 
@@ -1081,59 +1115,93 @@ function renderJournal() {
 
     const meta = document.createElement("div");
     meta.className = "entry-meta";
-    const location = entry.city || "No city";
-    const date = entry.date || "No date";
-    const time = entry.time || "No time";
-    meta.textContent = `${location} / ${date} / ${time}`;
+    meta.textContent = `${group.location} / ${group.date}`;
 
-    const menu = document.createElement("details");
-    menu.className = "entry-menu";
+    head.append(meta);
+    article.append(head);
 
-    const summary = document.createElement("summary");
-    summary.setAttribute("aria-label", "Entry options");
-    summary.textContent = "...";
+    group.entries.forEach((entry) => {
+      const entryBlock = document.createElement("div");
+      entryBlock.className = "journal-entry-item";
 
-    const menuItems = document.createElement("div");
-    menuItems.className = "entry-menu-items";
+      const entryHead = document.createElement("div");
+      entryHead.className = "journal-entry-item-head";
 
-    const editButton = document.createElement("button");
-    editButton.type = "button";
-    editButton.textContent = "Edit";
-    editButton.addEventListener("click", () => {
-      menu.open = false;
-      startJournalEdit(entry);
+      const time = document.createElement("div");
+      time.className = "entry-time";
+      time.textContent = entry.time || "No time";
+
+      const menu = makeJournalEntryMenu(entry);
+      entryHead.append(time, menu);
+      entryBlock.append(entryHead);
+
+      const label = getEntryLabel(entry);
+      if (label) {
+        const labels = document.createElement("div");
+        labels.className = "entry-tags";
+        const tagPill = document.createElement("span");
+        tagPill.textContent = label;
+        labels.append(tagPill);
+        entryBlock.append(labels);
+      }
+
+      const text = document.createElement("p");
+      text.textContent = entry.text;
+      entryBlock.append(text);
+      article.append(entryBlock);
     });
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.textContent = "Delete";
-    deleteButton.className = "danger-text";
-    deleteButton.addEventListener("click", () => {
-      menu.open = false;
-      deleteJournalEntry(entry.id);
-    });
-
-    menuItems.append(editButton, deleteButton);
-    menu.append(summary, menuItems);
-    head.append(meta, menu);
-
-    const text = document.createElement("p");
-    text.textContent = entry.text;
-
-    const label = getEntryLabel(entry);
-    if (label) {
-      const labels = document.createElement("div");
-      labels.className = "entry-tags";
-      const tagPill = document.createElement("span");
-      tagPill.textContent = label;
-      labels.append(tagPill);
-      article.append(head, labels, text);
-    } else {
-      article.append(head, text);
-    }
 
     els.journalLog.append(article);
   });
+}
+
+function groupJournalEntries(entries) {
+  const groups = new Map();
+
+  entries.forEach((entry) => {
+    const location = entry.city || "No city";
+    const date = entry.date || "No date";
+    const key = `${location}\u0000${date}`;
+    if (!groups.has(key)) {
+      groups.set(key, { location, date, entries: [] });
+    }
+    groups.get(key).entries.push(entry);
+  });
+
+  return [...groups.values()];
+}
+
+function makeJournalEntryMenu(entry) {
+  const menu = document.createElement("details");
+  menu.className = "entry-menu";
+
+  const summary = document.createElement("summary");
+  summary.setAttribute("aria-label", "Entry options");
+  summary.textContent = "...";
+
+  const menuItems = document.createElement("div");
+  menuItems.className = "entry-menu-items";
+
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.textContent = "Edit";
+  editButton.addEventListener("click", () => {
+    menu.open = false;
+    startJournalEdit(entry);
+  });
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.textContent = "Delete";
+  deleteButton.className = "danger-text";
+  deleteButton.addEventListener("click", () => {
+    menu.open = false;
+    deleteJournalEntry(entry.id);
+  });
+
+  menuItems.append(editButton, deleteButton);
+  menu.append(summary, menuItems);
+  return menu;
 }
 
 function emptyState(message) {

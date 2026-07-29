@@ -14,11 +14,17 @@
         </div>
       </header>
 
-      <nav class="tabs" aria-label="Planner sections">
-        <button class="tab is-active" type="button" data-view="calendar">Calendar</button>
-        <button class="tab" type="button" data-view="goals">Goals</button>
-        <button class="tab" type="button" data-view="journal">Journal</button>
-      </nav>
+      <div class="section-switcher">
+        <nav class="tabs" aria-label="Planner sections">
+          <button class="tab is-active" type="button" data-view="calendar">Calendar</button>
+          <button class="tab" type="button" data-view="goals">Goals</button>
+          <button class="tab" type="button" data-view="journal">Journal</button>
+        </nav>
+        <label class="palette-control">
+          <span>Palette</span>
+          <select id="paletteSelect"></select>
+        </label>
+      </div>
 
       <section class="view is-active" id="calendarView" aria-label="Calendar">
         <div class="calendar-layout">
