@@ -47,6 +47,7 @@ const els = {
   weekdayRow: document.querySelector("#weekdayRow"),
   calendarGrid: document.querySelector("#calendarGrid"),
   selectedDateInput: document.querySelector("#selectedDateInput"),
+  calendarRemoveOldDataButton: document.querySelector("#calendarRemoveOldDataButton"),
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
   emojiPalette: document.querySelector("#emojiPalette"),
@@ -411,6 +412,10 @@ function bindEvents() {
     els.journalFilterYear.value = "";
     els.journalFilterLabel.value = "";
     renderJournal();
+  });
+
+  els.calendarRemoveOldDataButton.addEventListener("click", () => {
+    removeOldData();
   });
 
   els.removeOldDataButton.addEventListener("click", () => {

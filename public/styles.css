@@ -208,6 +208,24 @@ textarea:focus {
   background: #075f24;
 }
 
+.cleanup-button {
+  align-self: end;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(22, 51, 33, 0.16);
+  border-radius: var(--radius);
+  color: rgba(22, 51, 33, 0.58);
+  background: rgba(255, 255, 255, 0.28);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.cleanup-button:hover {
+  border-color: rgba(156, 51, 40, 0.24);
+  color: #8d3f14;
+  background: rgba(255, 243, 229, 0.56);
+}
+
 .danger {
   color: white;
 }
@@ -457,7 +475,7 @@ textarea:focus {
 .calendar-date-controls {
   align-items: stretch;
   display: grid;
-  grid-template-columns: minmax(170px, 1.35fr) minmax(130px, 1fr) minmax(96px, 0.7fr) auto;
+  grid-template-columns: minmax(170px, 1.35fr) minmax(130px, 1fr) minmax(96px, 0.7fr) auto auto;
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
@@ -785,7 +803,7 @@ textarea:focus {
     minmax(105px, 0.7fr)
     minmax(130px, 0.9fr)
     auto
-    auto;
+    minmax(118px, auto);
   width: 100%;
 }
 
