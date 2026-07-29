@@ -267,6 +267,14 @@ textarea:focus {
   overflow: hidden;
 }
 
+.calendar-panel-top {
+  display: flex;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.24);
+}
+
 .weekday-row,
 .calendar-grid {
   display: grid;
@@ -759,8 +767,9 @@ textarea:focus {
   flex-wrap: wrap;
   gap: 8px;
   color: var(--green);
-  font-size: 0.78rem;
+  font-size: clamp(0.92rem, 1.1vw, 1.05rem);
   font-weight: 900;
+  line-height: 1.25;
 }
 
 .entry-tags {

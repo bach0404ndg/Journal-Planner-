@@ -21,15 +21,6 @@
       </nav>
 
       <section class="view is-active" id="calendarView" aria-label="Calendar">
-        <div class="section-head">
-          <div class="calendar-actions" aria-label="Calendar controls">
-            <div class="range-switch" aria-label="Calendar range">
-              <button class="range-button" type="button" data-range="four">4 weeks</button>
-              <button class="range-button is-active" type="button" data-range="week">1 week</button>
-            </div>
-          </div>
-        </div>
-
         <div class="calendar-layout">
           <aside class="side-panel" aria-label="Calendar task editor">
             <div class="calendar-date-controls" aria-label="Calendar date controls">
@@ -60,6 +51,12 @@
           </aside>
 
           <section class="calendar-panel" aria-label="Monthly calendar">
+            <div class="calendar-panel-top">
+              <div class="range-switch" aria-label="Calendar range">
+                <button class="range-button" type="button" data-range="four">4 weeks</button>
+                <button class="range-button is-active" type="button" data-range="week">1 week</button>
+              </div>
+            </div>
             <div class="weekday-row" id="weekdayRow"></div>
             <div class="calendar-grid" id="calendarGrid"></div>
           </section>
