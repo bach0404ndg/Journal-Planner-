@@ -561,11 +561,12 @@ textarea:focus {
   min-height: 420px;
   padding: 16px;
   transition: border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease, transform 140ms ease;
+  cursor: grab;
 }
 
 .goal-section header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   margin-bottom: 14px;
@@ -573,6 +574,7 @@ textarea:focus {
 
 .goal-section.is-dragging {
   opacity: 0.58;
+  cursor: grabbing;
 }
 
 .goal-section.is-drop-target {
@@ -581,24 +583,13 @@ textarea:focus {
   transform: translateY(-2px);
 }
 
-.drag-handle {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  min-width: 30px;
-  min-height: 42px;
-  padding: 0;
-  border: 1px solid rgba(8, 116, 43, 0.28);
-  border-radius: var(--radius);
-  color: var(--green);
-  background: rgba(255, 255, 255, 0.58);
-  font-size: 1rem;
-  font-weight: 900;
-  cursor: grab;
+.goal-section input,
+.goal-section button {
+  cursor: auto;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
+.goal-section button {
+  cursor: pointer;
 }
 
 .section-title-input {
@@ -726,6 +717,17 @@ textarea:focus {
   gap: 10px;
   align-items: end;
   flex-wrap: wrap;
+}
+
+.journal-filter-controls {
+  display: grid;
+  grid-template-columns:
+    minmax(170px, 1.2fr)
+    minmax(140px, 0.9fr)
+    minmax(120px, 0.75fr)
+    minmax(150px, 1fr)
+    auto;
+  width: 100%;
 }
 
 .journal-label-row select,

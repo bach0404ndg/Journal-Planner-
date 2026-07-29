@@ -741,21 +741,26 @@ function renderGoals() {
     const fragment = els.goalSectionTemplate.content.cloneNode(true);
     const card = fragment.querySelector(".goal-section");
     const titleInput = fragment.querySelector(".section-title-input");
-    const dragHandle = fragment.querySelector("[data-action='move-section']");
     const deleteSectionButton = fragment.querySelector("[data-action='delete-section']");
     const goalForm = fragment.querySelector(".goal-form");
     const goalInput = goalForm.querySelector("input");
     const goalList = fragment.querySelector(".goal-list");
 
     card.dataset.sectionId = section.id;
+    card.draggable = true;
     titleInput.value = section.title;
-    dragHandle.addEventListener("dragstart", (event) => {
+    card.addEventListener("dragstart", (event) => {
+      if (event.target.closest("input, button, select, textarea")) {
+        event.preventDefault();
+        return;
+      }
+
       state.draggingGoalSectionId = section.id;
       card.classList.add("is-dragging");
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", section.id);
     });
-    dragHandle.addEventListener("dragend", () => {
+    card.addEventListener("dragend", () => {
       state.draggingGoalSectionId = null;
       card.classList.remove("is-dragging");
       els.goalSections.querySelectorAll(".is-drop-target").forEach((item) => item.classList.remove("is-drop-target"));
