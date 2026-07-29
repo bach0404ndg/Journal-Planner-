@@ -46,7 +46,6 @@ const els = {
   weekdayRow: document.querySelector("#weekdayRow"),
   calendarGrid: document.querySelector("#calendarGrid"),
   selectedDateInput: document.querySelector("#selectedDateInput"),
-  selectedDateLabel: document.querySelector("#selectedDateLabel"),
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
   emojiPalette: document.querySelector("#emojiPalette"),
@@ -581,7 +580,6 @@ function makeTaskRow(note, dateKey, variant) {
 
 function renderSelectedDateNotes() {
   els.selectedDateInput.value = state.selectedDate;
-  els.selectedDateLabel.textContent = readableDate(state.selectedDate);
   renderEmojiPalette();
   els.selectedDateNotes.innerHTML = "";
   const notes = state.data.calendarNotes[state.selectedDate] || [];
