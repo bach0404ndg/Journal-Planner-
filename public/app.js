@@ -47,6 +47,7 @@ const state = {
   range: "week",
   editingJournalId: null,
   draggingGoalSectionId: null,
+  draggingCalendarTask: null,
   undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
   data: loadData(),
@@ -755,6 +756,20 @@ function renderCalendar() {
     cell.classList.toggle("is-muted", !isCurrentMonth);
     cell.classList.toggle("is-today", dateKey === todayKey);
     cell.classList.toggle("is-selected", dateKey === state.selectedDate);
+    cell.addEventListener("dragover", (event) => {
+      if (!state.draggingCalendarTask) return;
+      event.preventDefault();
+      cell.classList.add("is-task-drop-target");
+    });
+    cell.addEventListener("dragleave", (event) => {
+      if (event.currentTarget.contains(event.relatedTarget)) return;
+      cell.classList.remove("is-task-drop-target");
+    });
+    cell.addEventListener("drop", (event) => {
+      event.preventDefault();
+      cell.classList.remove("is-task-drop-target");
+      moveDraggedCalendarTask(dateKey);
+    });
     cell.addEventListener("click", (event) => {
       if (event.target.closest("button, input, label")) return;
       state.selectedDate = dateKey;
@@ -853,6 +868,63 @@ function makeCalendarTask(note, dateKey) {
   return makeTaskRow(note, dateKey, "calendar");
 }
 
+function moveDraggedCalendarTask(targetDateKey) {
+  const draggingTask = state.draggingCalendarTask;
+  if (!draggingTask || draggingTask.dateKey === targetDateKey) {
+    clearCalendarTaskDrag();
+    return;
+  }
+
+  if (draggingTask.type === "calendar-task") {
+    moveCalendarTask(draggingTask.dateKey, draggingTask.noteId, targetDateKey);
+  }
+
+  if (draggingTask.type === "goal-task") {
+    moveGoalTaskDate(draggingTask.sectionId, draggingTask.goalId, targetDateKey);
+  }
+
+  clearCalendarTaskDrag();
+}
+
+function clearCalendarTaskDrag() {
+  state.draggingCalendarTask = null;
+  document.querySelectorAll(".is-task-drop-target").forEach((item) => item.classList.remove("is-task-drop-target"));
+  document.querySelectorAll(".is-task-dragging").forEach((item) => item.classList.remove("is-task-dragging"));
+}
+
+function moveCalendarTask(sourceDateKey, noteId, targetDateKey) {
+  const sourceNotes = state.data.calendarNotes[sourceDateKey] || [];
+  const noteIndex = sourceNotes.findIndex((note) => note.id === noteId);
+  if (noteIndex === -1) return;
+
+  queueUndo("calendar task move");
+  const [note] = sourceNotes.splice(noteIndex, 1);
+  if (!sourceNotes.length) {
+    delete state.data.calendarNotes[sourceDateKey];
+  } else {
+    state.data.calendarNotes[sourceDateKey] = sourceNotes;
+  }
+  state.data.calendarNotes[targetDateKey] = [...(state.data.calendarNotes[targetDateKey] || []), note];
+  setCalendarDate(targetDateKey);
+  saveData();
+  renderCalendar();
+  renderSelectedDateNotes();
+}
+
+function moveGoalTaskDate(sectionId, goalId, targetDateKey) {
+  const section = getGoalSections().find((item) => item.id === sectionId);
+  const goal = section?.goals.find((item) => item.id === goalId);
+  if (!goal || goal.dueDate === targetDateKey) return;
+
+  queueUndo("goal date move");
+  goal.dueDate = targetDateKey;
+  setCalendarDate(targetDateKey);
+  saveData();
+  renderCalendar();
+  renderSelectedDateNotes();
+  renderGoals();
+}
+
 function getGoalsForDate(dateKey) {
   return getGoalSections().flatMap((section) =>
     section.goals.filter((goal) => goal.dueDate === dateKey).map((goal) => ({ section, goal })),
@@ -860,11 +932,17 @@ function getGoalsForDate(dateKey) {
 }
 
 function makeCalendarGoalTask(goalMatch, variant) {
-  const { goal } = goalMatch;
+  const { section, goal } = goalMatch;
   const task = document.createElement("div");
   task.className = variant === "calendar" ? "note-pill calendar-task calendar-goal-task" : "mini-item calendar-task calendar-goal-task";
   task.classList.toggle("is-done", Boolean(goal.done));
   task.addEventListener("click", (event) => event.stopPropagation());
+  task.append(makeTaskDragHandle("goal-task", {
+    dateKey: goal.dueDate,
+    sectionId: section.id,
+    goalId: goal.id,
+    task,
+  }));
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -949,6 +1027,11 @@ function makeTaskRow(note, dateKey, variant) {
   task.className = variant === "calendar" ? "note-pill calendar-task" : "mini-item calendar-task";
   task.classList.toggle("is-done", Boolean(note.done));
   task.addEventListener("click", (event) => event.stopPropagation());
+  task.append(makeTaskDragHandle("calendar-task", {
+    dateKey,
+    noteId: note.id,
+    task,
+  }));
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -988,6 +1071,25 @@ function makeTaskRow(note, dateKey, variant) {
 
   task.append(checkbox, input, deleteButton);
   return task;
+}
+
+function makeTaskDragHandle(type, details) {
+  const handle = document.createElement("span");
+  handle.className = "task-drag-handle";
+  handle.draggable = true;
+  handle.role = "button";
+  handle.tabIndex = 0;
+  handle.title = "Drag to another date";
+  handle.setAttribute("aria-label", "Drag task to another date");
+  handle.addEventListener("click", (event) => event.stopPropagation());
+  handle.addEventListener("dragstart", (event) => {
+    state.draggingCalendarTask = { type, ...details };
+    details.task.classList.add("is-task-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", type);
+  });
+  handle.addEventListener("dragend", clearCalendarTaskDrag);
+  return handle;
 }
 
 function renderSelectedDateNotes() {

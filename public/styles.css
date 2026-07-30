@@ -449,6 +449,12 @@ textarea:focus {
   outline-offset: -3px;
 }
 
+.day-cell.is-task-drop-target {
+  outline: 3px solid rgba(var(--green-rgb), 0.28);
+  outline-offset: -3px;
+  background: rgba(var(--green-rgb), 0.08);
+}
+
 .day-header {
   display: flex;
   align-items: center;
@@ -527,9 +533,44 @@ textarea:focus {
 
 .calendar-task {
   display: grid;
+  grid-template-rows: auto auto;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 7px;
+  gap: 4px 7px;
   align-items: center;
+}
+
+.task-drag-handle {
+  display: grid;
+  grid-column: 1 / -1;
+  place-items: center;
+  width: 100%;
+  height: 10px;
+  min-height: 10px;
+  margin: -2px 0 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.task-drag-handle::before {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(var(--green-rgb), 0.28);
+}
+
+.task-drag-handle:hover::before,
+.calendar-task.is-task-dragging .task-drag-handle::before {
+  background: rgba(var(--green-rgb), 0.5);
+}
+
+.task-drag-handle:active {
+  cursor: pointer;
+}
+
+.calendar-task.is-task-dragging {
+  opacity: 0.62;
 }
 
 .calendar-task input[type="checkbox"],
