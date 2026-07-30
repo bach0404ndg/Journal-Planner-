@@ -18,6 +18,7 @@ const monthNames = [
 const weekdayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const defaultJournalLabels = ["Grateful", "Idea", "Memory", "Reflection"];
+const defaultJournalLogWidth = 58;
 
 const paletteOptions = [
   { id: "green", name: "Green", color: "#08742b" },
@@ -82,6 +83,7 @@ const els = {
   cancelJournalEditButton: document.querySelector("#cancelJournalEditButton"),
   journalEntryToggle: document.querySelector("#journalEntryToggle"),
   journalLayout: document.querySelector("#journalLayout"),
+  journalResizeHandle: document.querySelector("#journalResizeHandle"),
   journalLog: document.querySelector("#journalLog"),
   journalFilterDate: document.querySelector("#journalFilterDate"),
   journalFilterMonth: document.querySelector("#journalFilterMonth"),
@@ -103,6 +105,7 @@ function loadData() {
         journalEntries: saved.journalEntries || [],
         palette: normalizePalette(saved.palette),
         journalEntryCollapsed: Boolean(saved.journalEntryCollapsed),
+        journalLogWidth: normalizeJournalLogWidth(saved.journalLogWidth),
       };
     }
   } catch (error) {
@@ -117,6 +120,7 @@ function loadData() {
     journalEntries: [],
     palette: "green",
     journalEntryCollapsed: false,
+    journalLogWidth: 58,
   };
 }
 
@@ -242,6 +246,16 @@ function normalizePalette(savedPalette) {
   return paletteOptions.some((palette) => palette.id === savedPalette) ? savedPalette : "green";
 }
 
+function normalizeJournalLogWidth(savedWidth) {
+  const width = Number(savedWidth);
+  if (!Number.isFinite(width)) return defaultJournalLogWidth;
+  return Math.min(Math.max(width, 42), 68);
+}
+
+function snapJournalLogWidth(width) {
+  return Math.abs(width - defaultJournalLogWidth) <= 1.6 ? defaultJournalLogWidth : width;
+}
+
 function getEntryLabel(entry) {
   if (entry.label) return entry.label;
   if (Array.isArray(entry.tags) && entry.tags.length) return entry.tags[0];
@@ -353,6 +367,8 @@ function bindEvents() {
     saveData();
     applyJournalLayout();
   });
+
+  els.journalResizeHandle.addEventListener("pointerdown", startJournalResize);
 
   els.tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -504,12 +520,45 @@ function renderPaletteOptions() {
 }
 
 function applyJournalLayout() {
+  const logWidth = normalizeJournalLogWidth(state.data.journalLogWidth);
   els.journalLayout.dataset.entryCollapsed = state.data.journalEntryCollapsed ? "true" : "false";
+  els.journalLayout.dataset.defaultSplit = logWidth === defaultJournalLogWidth ? "true" : "false";
+  els.journalLayout.style.setProperty("--journal-log-width", `${logWidth}%`);
+  els.journalLayout.style.setProperty("--journal-entry-width", `${100 - logWidth}%`);
+  els.journalLayout.style.setProperty("--journal-reading-width", `${Math.round(640 + logWidth * 8)}px`);
   els.journalEntryToggle.textContent = state.data.journalEntryCollapsed ? "›" : "‹";
   els.journalEntryToggle.setAttribute(
     "aria-label",
     state.data.journalEntryCollapsed ? "Open entry box" : "Close entry box",
   );
+}
+
+function startJournalResize(event) {
+  event.preventDefault();
+  els.journalResizeHandle.setPointerCapture(event.pointerId);
+  document.body.classList.add("is-resizing-journal");
+
+  const updateWidth = (pointerEvent) => {
+    const rect = els.journalLayout.getBoundingClientRect();
+    const width = ((rect.right - pointerEvent.clientX) / rect.width) * 100;
+    state.data.journalLogWidth = snapJournalLogWidth(normalizeJournalLogWidth(width));
+    applyJournalLayout();
+  };
+
+  const stopResize = (pointerEvent) => {
+    updateWidth(pointerEvent);
+    saveData();
+    document.body.classList.remove("is-resizing-journal");
+    els.journalResizeHandle.releasePointerCapture(pointerEvent.pointerId);
+    els.journalResizeHandle.removeEventListener("pointermove", updateWidth);
+    els.journalResizeHandle.removeEventListener("pointerup", stopResize);
+    els.journalResizeHandle.removeEventListener("pointercancel", stopResize);
+  };
+
+  updateWidth(event);
+  els.journalResizeHandle.addEventListener("pointermove", updateWidth);
+  els.journalResizeHandle.addEventListener("pointerup", stopResize);
+  els.journalResizeHandle.addEventListener("pointercancel", stopResize);
 }
 
 function selectFirstVisibleDate() {
