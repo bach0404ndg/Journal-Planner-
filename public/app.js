@@ -47,6 +47,7 @@ const state = {
   range: "week",
   editingJournalId: null,
   draggingGoalSectionId: null,
+  undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
   data: loadData(),
 };
@@ -65,6 +66,7 @@ const els = {
   selectedDateNotes: document.querySelector("#selectedDateNotes"),
   todayButton: document.querySelector("#todayButton"),
   rangeButtons: document.querySelectorAll(".range-button"),
+  undoButton: document.querySelector("#undoButton"),
   tabs: document.querySelectorAll(".tab"),
   views: document.querySelectorAll(".view"),
   sectionForm: document.querySelector("#sectionForm"),
@@ -126,6 +128,38 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+  updateUndoButton();
+}
+
+function cloneData(data) {
+  return JSON.parse(JSON.stringify(data));
+}
+
+function queueUndo(label = "last change") {
+  state.undoSnapshot = {
+    label,
+    data: cloneData(state.data),
+  };
+  updateUndoButton();
+}
+
+function restoreLastAction() {
+  if (!state.undoSnapshot) return;
+
+  state.data = cloneData(state.undoSnapshot.data);
+  state.undoSnapshot = null;
+  state.editingJournalId = null;
+  saveData();
+  applyPalette();
+  renderPaletteOptions();
+  applyJournalLayout();
+  renderAll();
+}
+
+function updateUndoButton() {
+  if (!els.undoButton) return;
+  els.undoButton.disabled = !state.undoSnapshot;
+  els.undoButton.title = state.undoSnapshot ? `Undo ${state.undoSnapshot.label}` : "Nothing to undo";
 }
 
 function toDateKey(date) {
@@ -310,6 +344,7 @@ function init() {
   ensureStarterSections();
   renderJournalLabelOptions();
   renderAll();
+  updateUndoButton();
 }
 
 function bindEvents() {
@@ -357,16 +392,21 @@ function bindEvents() {
   });
 
   els.paletteSelect.addEventListener("change", () => {
+    if (normalizePalette(els.paletteSelect.value) === state.data.palette) return;
+    queueUndo("palette change");
     state.data.palette = normalizePalette(els.paletteSelect.value);
     saveData();
     applyPalette();
   });
 
   els.journalEntryToggle.addEventListener("click", () => {
+    queueUndo("journal layout change");
     state.data.journalEntryCollapsed = !state.data.journalEntryCollapsed;
     saveData();
     applyJournalLayout();
   });
+
+  els.undoButton.addEventListener("click", restoreLastAction);
 
   els.journalResizeHandle.addEventListener("pointerdown", startJournalResize);
 
@@ -387,6 +427,7 @@ function bindEvents() {
     const text = els.calendarNoteInput.value.trim();
     if (!text || !state.selectedDate) return;
 
+    queueUndo("calendar task");
     const notes = state.data.calendarNotes[state.selectedDate] || [];
     notes.push({ id: makeId("note"), text, done: false });
     state.data.calendarNotes[state.selectedDate] = notes;
@@ -399,6 +440,7 @@ function bindEvents() {
   els.sectionForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const title = els.sectionNameInput.value.trim() || "New section";
+    queueUndo("goal section");
     addGoalSection(title);
     els.sectionNameInput.value = "";
   });
@@ -416,6 +458,7 @@ function bindEvents() {
       text: entryText,
     };
 
+    queueUndo(state.editingJournalId ? "journal entry edit" : "journal entry");
     if (state.editingJournalId) {
       const entry = state.data.journalEntries.find((item) => item.id === state.editingJournalId);
       if (entry) {
@@ -441,6 +484,11 @@ function bindEvents() {
     if (!label) return;
     const clean = label.trim().slice(0, 32);
     if (!clean) return;
+    if (state.data.journalLabels.includes(clean)) {
+      renderJournalLabelOptions(clean);
+      return;
+    }
+    queueUndo("journal label");
     ensureJournalLabel(clean);
     renderJournalLabelOptions(clean);
     renderJournal();
@@ -453,6 +501,7 @@ function bindEvents() {
     const confirmed = window.confirm(`Remove "${label}" from saved labels and journal entries?`);
     if (!confirmed) return;
 
+    queueUndo("journal label removal");
     state.data.journalLabels = state.data.journalLabels.filter((item) => item !== label);
     state.data.journalEntries.forEach((entry) => {
       if (getEntryLabel(entry) === label) {
@@ -539,6 +588,7 @@ function applyJournalLayout() {
 
 function startJournalResize(event) {
   event.preventDefault();
+  queueUndo("journal width change");
   els.journalResizeHandle.setPointerCapture(event.pointerId);
   document.body.classList.add("is-resizing-journal");
 
@@ -611,6 +661,7 @@ function moveGoalSection(draggedId, targetId) {
   const toIndex = sections.findIndex((section) => section.id === targetId);
   if (fromIndex === -1 || toIndex === -1) return;
 
+  queueUndo("goal section order");
   const [movedSection] = sections.splice(fromIndex, 1);
   sections.splice(toIndex, 0, movedSection);
   saveData();
@@ -635,10 +686,11 @@ function removeOldData() {
   if (!cutoffDate || !/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate)) return;
 
   const confirmed = window.confirm(
-    `Remove journal entries, calendar tasks, day markers, and dated goals before ${cutoffDate}? This cannot be undone.`,
+    `Remove journal entries, calendar tasks, day markers, and dated goals before ${cutoffDate}? You can undo this once.`,
   );
   if (!confirmed) return;
 
+  queueUndo("old data removal");
   const before = {
     calendarDays: Object.keys(state.data.calendarNotes).length,
     markerDays: Object.keys(state.data.dayEmojis).length,
@@ -781,6 +833,7 @@ function renderEmojiPalette() {
 
 function toggleDayEmoji(emoji) {
   const emojis = state.data.dayEmojis[state.selectedDate] || [];
+  queueUndo("day marker");
   if (emojis.includes(emoji)) {
     state.data.dayEmojis[state.selectedDate] = emojis.filter((item) => item !== emoji);
   } else {
@@ -818,6 +871,7 @@ function makeCalendarGoalTask(goalMatch, variant) {
   checkbox.checked = Boolean(goal.done);
   checkbox.setAttribute("aria-label", "Mark goal complete");
   checkbox.addEventListener("change", () => {
+    queueUndo("goal status");
     goal.done = checkbox.checked;
     saveData();
     renderCalendar();
@@ -833,8 +887,10 @@ function makeCalendarGoalTask(goalMatch, variant) {
   input.addEventListener("change", () => {
     const nextText = input.value.trim();
     if (!nextText) {
+      queueUndo("goal deletion");
       goalMatch.section.goals = goalMatch.section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
-    } else {
+    } else if (goal.text !== nextText) {
+      queueUndo("goal edit");
       goal.text = nextText;
     }
     saveData();
@@ -859,6 +915,8 @@ function makeCalendarGoalTask(goalMatch, variant) {
 
 function deleteCalendarTask(dateKey, noteId) {
   const notes = state.data.calendarNotes[dateKey] || [];
+  if (!notes.some((note) => note.id === noteId)) return;
+  queueUndo("calendar task deletion");
   state.data.calendarNotes[dateKey] = notes.filter((note) => note.id !== noteId);
   if (!state.data.calendarNotes[dateKey].length) {
     delete state.data.calendarNotes[dateKey];
@@ -876,6 +934,8 @@ function updateCalendarTaskText(dateKey, noteId, text) {
     deleteCalendarTask(dateKey, noteId);
     return;
   }
+  if (note.text === nextText) return;
+  queueUndo("calendar task edit");
   note.text = nextText;
   saveData();
   renderCalendar();
@@ -895,6 +955,7 @@ function makeTaskRow(note, dateKey, variant) {
   checkbox.checked = Boolean(note.done);
   checkbox.setAttribute("aria-label", "Mark calendar task complete");
   checkbox.addEventListener("change", () => {
+    queueUndo("calendar task status");
     note.done = checkbox.checked;
     saveData();
     renderCalendar();
@@ -994,6 +1055,8 @@ function startJournalEdit(entry) {
 }
 
 function deleteJournalEntry(entryId) {
+  if (!state.data.journalEntries.some((item) => item.id === entryId)) return;
+  queueUndo("journal entry deletion");
   state.data.journalEntries = state.data.journalEntries.filter((item) => item.id !== entryId);
   if (state.editingJournalId === entryId) {
     resetJournalForm();
@@ -1067,11 +1130,14 @@ function renderGoals() {
     });
 
     titleInput.addEventListener("change", () => {
+      if ((titleInput.value.trim() || "Untitled") === section.title) return;
+      queueUndo("goal section title");
       section.title = titleInput.value.trim() || "Untitled";
       saveData();
     });
 
     deleteSectionButton.addEventListener("click", () => {
+      queueUndo("goal section deletion");
       state.data.goalSections = sections.filter((item) => item.id !== section.id);
       saveData();
       renderGoals();
@@ -1081,6 +1147,7 @@ function renderGoals() {
       event.preventDefault();
       const text = goalInput.value.trim();
       if (!text) return;
+      queueUndo("goal");
       section.goals.push({ id: makeId("goal"), text, done: false, dueDate: "" });
       goalInput.value = "";
       saveData();
@@ -1106,6 +1173,7 @@ function renderGoalItem(section, goal) {
   checkbox.checked = goal.done;
   checkbox.setAttribute("aria-label", "Mark goal complete");
   checkbox.addEventListener("change", () => {
+    queueUndo("goal status");
     goal.done = checkbox.checked;
     saveData();
     renderGoals();
@@ -1120,8 +1188,10 @@ function renderGoalItem(section, goal) {
   text.addEventListener("change", () => {
     const nextText = text.value.trim();
     if (!nextText) {
+      queueUndo("goal deletion");
       section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
-    } else {
+    } else if (goal.text !== nextText) {
+      queueUndo("goal edit");
       goal.text = nextText;
     }
     saveData();
@@ -1152,6 +1222,8 @@ function renderGoalItem(section, goal) {
   dateInput.setAttribute("aria-label", "Goal calendar date");
   dateInput.addEventListener("change", () => {
     if (!dateInput.value) return;
+    if (goal.dueDate === dateInput.value) return;
+    queueUndo("goal date");
     goal.dueDate = dateInput.value;
     setCalendarDate(goal.dueDate);
     menu.open = false;
@@ -1166,6 +1238,7 @@ function renderGoalItem(section, goal) {
   deleteButton.textContent = "Delete";
   deleteButton.className = "danger-text";
   deleteButton.addEventListener("click", () => {
+    queueUndo("goal deletion");
     section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
     menu.open = false;
     saveData();
@@ -1183,6 +1256,7 @@ function renderGoalItem(section, goal) {
   dateBadge.hidden = !goal.dueDate;
   dateBadge.title = "Double-click to remove date";
   dateBadge.addEventListener("dblclick", () => {
+    queueUndo("goal date removal");
     goal.dueDate = "";
     saveData();
     renderGoals();
@@ -1270,15 +1344,25 @@ function renderJournal() {
 
 function makeEditableJournalText(entry) {
   const text = document.createElement("textarea");
+  let editUndoQueued = false;
+  let savedText = entry.text || "";
   text.className = "journal-entry-text";
   text.value = entry.text || "";
   text.rows = 1;
   text.setAttribute("aria-label", "Edit saved journal text");
   text.addEventListener("input", () => {
+    if (!editUndoQueued && text.value !== savedText) {
+      queueUndo("journal text edit");
+      editUndoQueued = true;
+    }
     entry.text = text.value;
     entry.updatedAt = new Date().toISOString();
     saveData();
     resizeJournalText(text);
+  });
+  text.addEventListener("blur", () => {
+    editUndoQueued = false;
+    savedText = entry.text || "";
   });
   text.addEventListener("keydown", (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {

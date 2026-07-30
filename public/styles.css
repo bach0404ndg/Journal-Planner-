@@ -113,6 +113,31 @@ button {
   border-bottom: 1px solid rgba(22, 51, 33, 0.24);
 }
 
+.undo-button {
+  align-self: end;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(22, 51, 33, 0.16);
+  border-radius: 999px;
+  color: rgba(22, 51, 33, 0.58);
+  background: rgba(255, 255, 255, 0.28);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.undo-button:not(:disabled):hover {
+  border-color: rgba(var(--green-rgb), 0.28);
+  color: var(--green-meta);
+  background: rgba(var(--green-rgb), 0.08);
+}
+
+.undo-button:disabled {
+  cursor: default;
+  border-color: rgba(22, 51, 33, 0.12);
+  color: rgba(22, 51, 33, 0.36);
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .eyebrow,
 .panel-label {
   margin: 0 0 8px;
@@ -215,6 +240,13 @@ textarea:focus {
   justify-content: space-between;
   gap: 14px;
   margin: 18px 0;
+}
+
+.section-meta-controls {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .tabs {
