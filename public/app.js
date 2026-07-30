@@ -1255,14 +1255,39 @@ function renderJournal() {
       entryHead.append(timeLine, menu);
       entryBlock.append(entryHead);
 
-      const text = document.createElement("p");
-      text.textContent = entry.text;
+      const text = makeEditableJournalText(entry);
       entryBlock.append(text);
       article.append(entryBlock);
     });
 
     els.journalLog.append(article);
   });
+}
+
+function makeEditableJournalText(entry) {
+  const text = document.createElement("textarea");
+  text.className = "journal-entry-text";
+  text.value = entry.text || "";
+  text.rows = 1;
+  text.setAttribute("aria-label", "Edit saved journal text");
+  text.addEventListener("input", () => {
+    entry.text = text.value;
+    entry.updatedAt = new Date().toISOString();
+    saveData();
+    resizeJournalText(text);
+  });
+  text.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      text.blur();
+    }
+  });
+  requestAnimationFrame(() => resizeJournalText(text));
+  return text;
+}
+
+function resizeJournalText(textarea) {
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
 function groupJournalEntries(entries) {
