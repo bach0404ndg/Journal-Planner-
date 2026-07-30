@@ -113,7 +113,8 @@ button {
   border-bottom: 1px solid rgba(22, 51, 33, 0.24);
 }
 
-.undo-button {
+.undo-button,
+.metadata-button {
   align-self: end;
   min-height: 38px;
   padding: 0 12px;
@@ -125,7 +126,8 @@ button {
   font-weight: 750;
 }
 
-.undo-button:not(:disabled):hover {
+.undo-button:not(:disabled):hover,
+.metadata-button:hover {
   border-color: rgba(var(--green-rgb), 0.28);
   color: var(--green-meta);
   background: rgba(var(--green-rgb), 0.08);
