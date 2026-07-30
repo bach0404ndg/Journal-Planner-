@@ -376,6 +376,9 @@ function bindEvents() {
       els.views.forEach((view) => {
         view.classList.toggle("is-active", view.id === `${tab.dataset.view}View`);
       });
+      if (tab.dataset.view === "journal") {
+        requestAnimationFrame(resizeAllJournalTexts);
+      }
     });
   });
 
@@ -531,6 +534,7 @@ function applyJournalLayout() {
     "aria-label",
     state.data.journalEntryCollapsed ? "Open entry box" : "Close entry box",
   );
+  requestAnimationFrame(resizeAllJournalTexts);
 }
 
 function startJournalResize(event) {
@@ -1288,6 +1292,10 @@ function makeEditableJournalText(entry) {
 function resizeJournalText(textarea) {
   textarea.style.height = "auto";
   textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+function resizeAllJournalTexts() {
+  els.journalLog.querySelectorAll(".journal-entry-text").forEach(resizeJournalText);
 }
 
 function groupJournalEntries(entries) {
