@@ -63,8 +63,12 @@
           <section class="calendar-panel" aria-label="Monthly calendar">
             <div class="calendar-panel-top">
               <div class="range-switch" aria-label="Calendar range">
-                <button class="range-button" type="button" data-range="four">4 weeks</button>
-                <button class="range-button is-active" type="button" data-range="week">1 week</button>
+                <button class="range-button" type="button" data-range="month">Monthly</button>
+                <button class="range-button is-active" type="button" data-range="week">Weekly</button>
+              </div>
+              <div class="calendar-nav-buttons" aria-label="Calendar navigation">
+                <button class="metadata-button calendar-arrow-button" type="button" id="calendarPrevButton" aria-label="Previous calendar range">&lt;</button>
+                <button class="metadata-button calendar-arrow-button" type="button" id="calendarNextButton" aria-label="Next calendar range">&gt;</button>
               </div>
             </div>
             <div class="weekday-row" id="weekdayRow"></div>

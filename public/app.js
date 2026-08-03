@@ -66,6 +66,8 @@ const els = {
   paletteSelect: document.querySelector("#paletteSelect"),
   selectedDateNotes: document.querySelector("#selectedDateNotes"),
   todayButton: document.querySelector("#todayButton"),
+  calendarPrevButton: document.querySelector("#calendarPrevButton"),
+  calendarNextButton: document.querySelector("#calendarNextButton"),
   rangeButtons: document.querySelectorAll(".range-button"),
   undoButton: document.querySelector("#undoButton"),
   tabs: document.querySelectorAll(".tab"),
@@ -392,6 +394,14 @@ function bindEvents() {
     renderCalendar();
   });
 
+  els.calendarPrevButton.addEventListener("click", () => {
+    shiftCalendarRange(-1);
+  });
+
+  els.calendarNextButton.addEventListener("click", () => {
+    shiftCalendarRange(1);
+  });
+
   els.paletteSelect.addEventListener("change", () => {
     if (normalizePalette(els.paletteSelect.value) === state.data.palette) return;
     queueUndo("palette change");
@@ -620,6 +630,22 @@ function selectFirstVisibleDate() {
   state.selectedDate = `${state.year}-${String(state.month + 1).padStart(2, "0")}-01`;
 }
 
+function shiftCalendarRange(direction) {
+  const selectedDate = parseDateKey(state.selectedDate);
+  if (state.range === "week") {
+    setCalendarDate(toDateKey(addDays(selectedDate, direction * 7)));
+    renderCalendar();
+    return;
+  }
+
+  const targetMonth = selectedDate.getMonth() + direction;
+  const targetYear = selectedDate.getFullYear();
+  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const targetDay = Math.min(selectedDate.getDate(), daysInTargetMonth);
+  setCalendarDate(toDateKey(new Date(targetYear, targetMonth, targetDay)));
+  renderCalendar();
+}
+
 function setCalendarDate(dateKey) {
   const nextDate = parseDateKey(dateKey);
   state.selectedDate = dateKey;
@@ -739,9 +765,7 @@ function removeOldData() {
 }
 
 function renderCalendar() {
-  const selectedDate = parseDateKey(state.selectedDate);
-  const gridStart = startOfWeek(selectedDate);
-  const totalDays = state.range === "week" ? 7 : 28;
+  const { gridStart, totalDays } = getCalendarGridRange();
   els.calendarGrid.innerHTML = "";
   els.calendarGrid.classList.toggle("is-week-view", state.range === "week");
 
@@ -803,6 +827,23 @@ function renderCalendar() {
   }
 
   renderSelectedDateNotes();
+}
+
+function getCalendarGridRange() {
+  const selectedDate = parseDateKey(state.selectedDate);
+  if (state.range === "week") {
+    return {
+      gridStart: startOfWeek(selectedDate),
+      totalDays: 7,
+    };
+  }
+
+  const firstOfMonth = new Date(state.year, state.month, 1);
+  const lastOfMonth = new Date(state.year, state.month + 1, 0);
+  const gridStart = startOfWeek(firstOfMonth);
+  const gridEnd = addDays(startOfWeek(lastOfMonth), 6);
+  const totalDays = Math.round((gridEnd - gridStart) / 86400000) + 1;
+  return { gridStart, totalDays };
 }
 
 function makePill(text, className) {
