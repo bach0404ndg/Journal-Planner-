@@ -414,12 +414,12 @@ label {
 .special-task-color-menu {
   position: relative;
   width: auto;
-  min-width: 14px;
+  min-width: 16px;
 }
 
 .special-task-color-menu summary {
-  min-width: 14px;
-  min-height: 14px;
+  min-width: 16px;
+  min-height: 16px;
   padding: 0;
   font-size: 0.64rem;
 }
@@ -1220,6 +1220,17 @@ textarea:focus {
 .palette-control summary {
   min-width: 26px;
   min-height: 26px;
+}
+
+.special-task-color-menu.color-menu summary {
+  min-width: 16px;
+  min-height: 16px;
+  border-width: 0;
+  box-shadow: none;
+}
+
+.special-task-color-menu.color-menu summary:hover {
+  box-shadow: 0 0 0 2px rgba(22, 51, 33, 0.08);
 }
 
 .emoji-section {
