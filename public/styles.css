@@ -553,8 +553,16 @@ textarea:focus {
   display: grid;
   grid-template-rows: auto auto;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 4px 7px;
+  gap: 4px 5px;
   align-items: center;
+}
+
+.calendar-task-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: end;
+  gap: 1px;
+  white-space: nowrap;
 }
 
 .task-drag-handle {
@@ -589,6 +597,107 @@ textarea:focus {
 
 .calendar-task.is-task-dragging {
   opacity: 0.62;
+}
+
+.subtask-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 5px;
+  min-width: 0;
+  padding-left: 24px;
+}
+
+.subtask-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.subtask-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+
+.subtask-row input[type="checkbox"] {
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
+  accent-color: var(--green);
+}
+
+.subtask-add-button {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.34);
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.calendar-task-actions .subtask-add-button {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  font-size: 0.74rem;
+}
+
+.subtask-add-button:hover {
+  color: white;
+  background: var(--green-active);
+}
+
+.subtask-text-input {
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(22, 51, 33, 0.78);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.subtask-text-input:focus {
+  border-color: rgba(var(--green-rgb), 0.22);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 0 0 2px rgba(var(--green-rgb), 0.08);
+}
+
+.subtask-row.is-done .subtask-text-input {
+  color: rgba(22, 51, 33, 0.46);
+  text-decoration: line-through;
+}
+
+.subtask-delete-button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(156, 51, 40, 0.44);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.subtask-delete-button:hover {
+  color: #9c3328;
+  background: #fff0ee;
 }
 
 .calendar-task input[type="checkbox"],
@@ -628,6 +737,13 @@ textarea:focus {
   color: #9c3328;
   background: transparent;
   font-weight: 900;
+}
+
+.calendar-task-actions .task-delete-button {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  font-size: 0.68rem;
 }
 
 .task-delete-button:hover {
@@ -795,6 +911,126 @@ textarea:focus {
   gap: 18px;
 }
 
+.goal-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+}
+
+.goal-group-tab,
+.goal-group-add {
+  min-height: 32px;
+  border: 1px solid rgba(22, 51, 33, 0.12);
+  border-radius: 8px;
+  color: rgba(22, 51, 33, 0.7);
+  background: rgba(255, 255, 255, 0.42);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.goal-group-tab {
+  display: inline-grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  width: min(250px, 100%);
+  min-width: 170px;
+  max-width: min(250px, 100%);
+  overflow: visible;
+  padding: 3px 6px 3px 4px;
+  box-shadow: inset 0 -2px 0 rgba(var(--green-rgb), 0.08);
+}
+
+.goal-group-add {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+}
+
+.goal-group-tab.is-active {
+  border-color: rgba(var(--green-rgb), 0.3);
+  color: var(--green-meta);
+  background: rgba(var(--green-rgb), 0.1);
+  box-shadow: inset 0 -2px 0 rgba(var(--green-rgb), 0.24);
+}
+
+.goal-group-name {
+  display: block;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 30px;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 10px 5px 10px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.16);
+  font: inherit;
+  line-height: 1.18;
+  outline: 0;
+  overflow: hidden;
+  resize: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.goal-group-name:focus {
+  background: rgba(255, 255, 255, 0.36);
+  box-shadow: none;
+}
+
+.goal-group-name.is-locked-edit {
+  caret-color: transparent;
+}
+
+.goal-group-name.is-locked-edit:focus {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.goal-group-name.is-editing {
+  cursor: text;
+  caret-color: auto;
+}
+
+.goal-group-delete {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  color: rgba(22, 51, 33, 0.42);
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.goal-group-tab.is-active .goal-group-delete {
+  color: rgba(22, 51, 33, 0.48);
+}
+
+.goal-group-delete:hover {
+  color: white;
+  background: rgba(22, 51, 33, 0.28);
+}
+
+.goal-group-tab:not(.is-active):hover,
+.goal-group-add:hover {
+  border-color: rgba(var(--green-rgb), 0.22);
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.58);
+}
+
 .inline-form {
   width: min(720px, 100%);
 }
@@ -819,14 +1055,10 @@ textarea:focus {
 .goal-section header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 14px;
-  cursor: grab;
-}
-
-.goal-section header:active {
-  cursor: grabbing;
+  gap: 8px;
+  align-items: start;
+  min-height: 20px;
+  margin-bottom: 10px;
 }
 
 .goal-section.is-dragging {
@@ -849,13 +1081,57 @@ textarea:focus {
   cursor: pointer;
 }
 
+.goal-section-drag-handle {
+  display: grid;
+  grid-column: 1 / -1;
+  place-items: center;
+  width: 100%;
+  height: 12px;
+  min-height: 12px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.goal-section-drag-handle::before {
+  content: "";
+  display: block;
+  width: 38px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(var(--green-rgb), 0.24);
+}
+
+.goal-section-drag-handle:hover::before,
+.goal-section.is-dragging .goal-section-drag-handle::before {
+  background: rgba(var(--green-rgb), 0.48);
+}
+
 .section-title-input {
-  border-color: var(--green);
-  color: var(--green);
-  background: rgba(255, 255, 255, 0.34);
+  display: block;
+  width: min(360px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.2);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1.2rem;
   font-weight: 900;
+  line-height: 1.18;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  resize: none;
+  white-space: normal;
+  cursor: text;
+}
+
+.section-title-input:focus {
+  border-color: rgba(var(--green-rgb), 0.28);
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(var(--green-rgb), 0.08);
 }
 
 .goal-form {
@@ -865,6 +1141,24 @@ textarea:focus {
 
 .goal-form input {
   width: 100%;
+}
+
+.goal-section-add {
+  display: grid;
+  place-items: center;
+  min-height: 92px;
+  border: 1px dashed rgba(var(--green-rgb), 0.28);
+  border-radius: var(--radius);
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.24);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.goal-section-add:hover {
+  border-color: rgba(var(--green-rgb), 0.36);
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.38);
 }
 
 .goal-list {
@@ -905,6 +1199,14 @@ textarea:focus {
 .goal-text-wrap {
   display: grid;
   gap: 5px;
+}
+
+.goal-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
 }
 
 .goal-text-input {

@@ -19,6 +19,7 @@ const weekdayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const defaultJournalLabels = ["Grateful", "Idea", "Memory", "Reflection"];
 const defaultJournalLogWidth = 58;
+const defaultGoalGroupName = "General";
 
 const paletteOptions = [
   { id: "green", name: "Green", color: "#08742b" },
@@ -72,8 +73,7 @@ const els = {
   undoButton: document.querySelector("#undoButton"),
   tabs: document.querySelectorAll(".tab"),
   views: document.querySelectorAll(".view"),
-  sectionForm: document.querySelector("#sectionForm"),
-  sectionNameInput: document.querySelector("#sectionNameInput"),
+  goalGroupTabs: document.querySelector("#goalGroupTabs"),
   goalSections: document.querySelector("#goalSections"),
   goalSectionTemplate: document.querySelector("#goalSectionTemplate"),
   journalForm: document.querySelector("#journalForm"),
@@ -102,10 +102,14 @@ function loadData() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved && typeof saved === "object") {
+      const goalSections = normalizeGoalSections(saved.goalSections);
+      const goalGroups = normalizeGoalGroups(saved.goalGroups, goalSections);
       return {
-        calendarNotes: saved.calendarNotes || {},
+        calendarNotes: normalizeCalendarNotes(saved.calendarNotes),
         dayEmojis: saved.dayEmojis || {},
-        goalSections: normalizeGoalSections(saved.goalSections),
+        goalSections,
+        goalGroups,
+        activeGoalGroupId: normalizeActiveGoalGroupId(saved.activeGoalGroupId, goalGroups),
         journalLabels: normalizeJournalLabels(saved.journalLabels, saved.journalEntries),
         journalEntries: saved.journalEntries || [],
         palette: normalizePalette(saved.palette),
@@ -121,6 +125,8 @@ function loadData() {
     calendarNotes: {},
     dayEmojis: {},
     goalSections: [],
+    goalGroups: [{ id: makeId("goal-group"), title: defaultGoalGroupName, sections: [] }],
+    activeGoalGroupId: "",
     journalLabels: [...defaultJournalLabels],
     journalEntries: [],
     palette: "green",
@@ -174,7 +180,7 @@ function toDateKey(date) {
 
 function normalizeGoalSections(savedSections) {
   if (Array.isArray(savedSections)) {
-    return savedSections;
+    return savedSections.map(normalizeGoalSection);
   }
 
   if (!savedSections || typeof savedSections !== "object") {
@@ -199,17 +205,80 @@ function normalizeGoalSections(savedSections) {
         const targetSection = mergedSections.get(title);
         const goals = Array.isArray(section.goals) ? section.goals : [];
         goals.forEach((goal) => {
-          targetSection.goals.push({
-            id: goal.id || makeId("goal"),
-            text: goal.text || "",
-            done: Boolean(goal.done),
-            dueDate: goal.dueDate || "",
-          });
+          targetSection.goals.push(normalizeGoal(goal));
         });
       });
     });
 
   return [...mergedSections.values()];
+}
+
+function normalizeGoalGroups(savedGroups, legacySections = []) {
+  if (Array.isArray(savedGroups) && savedGroups.length) {
+    return savedGroups.map((group) => ({
+      id: group.id || makeId("goal-group"),
+      title: group.title || defaultGoalGroupName,
+      sections: Array.isArray(group.sections) ? group.sections.map(normalizeGoalSection) : [],
+    }));
+  }
+
+  return [
+    {
+      id: makeId("goal-group"),
+      title: defaultGoalGroupName,
+      sections: legacySections,
+    },
+  ];
+}
+
+function normalizeActiveGoalGroupId(savedId, groups) {
+  if (groups.some((group) => group.id === savedId)) return savedId;
+  return groups[0]?.id || "";
+}
+
+function normalizeCalendarNotes(savedNotes) {
+  if (!savedNotes || typeof savedNotes !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(savedNotes).map(([dateKey, notes]) => [
+      dateKey,
+      Array.isArray(notes) ? notes.map(normalizeTask) : [],
+    ]),
+  );
+}
+
+function normalizeGoalSection(section) {
+  return {
+    id: section.id || makeId("section"),
+    title: section.title || "Untitled",
+    goals: Array.isArray(section.goals) ? section.goals.map(normalizeGoal) : [],
+  };
+}
+
+function normalizeGoal(goal) {
+  return {
+    ...normalizeTask(goal),
+    dueDate: goal.dueDate || "",
+  };
+}
+
+function normalizeTask(task) {
+  return {
+    id: task.id || makeId("task"),
+    text: task.text || "",
+    done: Boolean(task.done),
+    subtasks: normalizeSubtasks(task.subtasks),
+  };
+}
+
+function normalizeSubtasks(subtasks) {
+  if (!Array.isArray(subtasks)) return [];
+
+  return subtasks.map((subtask) => ({
+    id: subtask.id || makeId("subtask"),
+    text: subtask.text || "",
+    done: Boolean(subtask.done),
+  }));
 }
 
 function readableDate(dateKey) {
@@ -440,20 +509,12 @@ function bindEvents() {
 
     queueUndo("calendar task");
     const notes = state.data.calendarNotes[state.selectedDate] || [];
-    notes.push({ id: makeId("note"), text, done: false });
+    notes.push({ id: makeId("note"), text, done: false, subtasks: [] });
     state.data.calendarNotes[state.selectedDate] = notes;
     els.calendarNoteInput.value = "";
     saveData();
     renderCalendar();
     renderSelectedDateNotes();
-  });
-
-  els.sectionForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const title = els.sectionNameInput.value.trim() || "New section";
-    queueUndo("goal section");
-    addGoalSection(title);
-    els.sectionNameInput.value = "";
   });
 
   els.journalForm.addEventListener("submit", (event) => {
@@ -657,9 +718,11 @@ function setCalendarDate(dateKey) {
 }
 
 function ensureStarterSections() {
-  if (state.data.goalSections.length) return;
+  ensureGoalGroups();
+  const activeGroup = getActiveGoalGroup();
+  if (activeGroup.sections.length || getAllGoalSections().length) return;
 
-  state.data.goalSections = [
+  activeGroup.sections = [
     { id: makeId("section"), title: "Priorities", goals: [] },
     { id: makeId("section"), title: "Optional goals", goals: [] },
     { id: makeId("section"), title: "Personal", goals: [] },
@@ -667,17 +730,78 @@ function ensureStarterSections() {
   saveData();
 }
 
-function getGoalSections() {
-  if (!Array.isArray(state.data.goalSections)) {
-    state.data.goalSections = [];
+function ensureGoalGroups() {
+  if (!Array.isArray(state.data.goalGroups) || !state.data.goalGroups.length) {
+    state.data.goalGroups = normalizeGoalGroups(null, normalizeGoalSections(state.data.goalSections));
   }
-  return state.data.goalSections;
+  state.data.activeGoalGroupId = normalizeActiveGoalGroupId(state.data.activeGoalGroupId, state.data.goalGroups);
 }
 
-function addGoalSection(title) {
+function getActiveGoalGroup() {
+  ensureGoalGroups();
+  return state.data.goalGroups.find((group) => group.id === state.data.activeGoalGroupId) || state.data.goalGroups[0];
+}
+
+function getGoalSections() {
+  const activeGroup = getActiveGoalGroup();
+  if (!Array.isArray(activeGroup.sections)) {
+    activeGroup.sections = [];
+  }
+  return activeGroup.sections;
+}
+
+function getAllGoalSections() {
+  ensureGoalGroups();
+  return state.data.goalGroups.flatMap((group) => group.sections || []);
+}
+
+function addGoalGroup() {
+  const title = window.prompt("New goal area", "General");
+  if (!title) return;
+  const clean = title.trim().slice(0, 36);
+  if (!clean) return;
+
+  queueUndo("goal area");
+  const group = { id: makeId("goal-group"), title: clean, sections: [] };
+  state.data.goalGroups.push(group);
+  state.data.activeGoalGroupId = group.id;
+  saveData();
+  renderGoals();
+}
+
+function deleteActiveGoalGroup(groupId = state.data.activeGoalGroupId) {
+  ensureGoalGroups();
+  const activeGroup = state.data.goalGroups.find((group) => group.id === groupId) || getActiveGoalGroup();
+  if (!activeGroup) return;
+
+  const confirmed = window.confirm(`Delete "${activeGroup.title}" and its goal boxes?`);
+  if (!confirmed) return;
+
+  queueUndo("goal area deletion");
+  if (state.data.goalGroups.length === 1) {
+    activeGroup.title = defaultGoalGroupName;
+    activeGroup.sections = [];
+  } else {
+    const groupIndex = state.data.goalGroups.findIndex((group) => group.id === activeGroup.id);
+    state.data.goalGroups = state.data.goalGroups.filter((group) => group.id !== activeGroup.id);
+    const nextGroup = state.data.goalGroups[Math.max(0, groupIndex - 1)] || state.data.goalGroups[0];
+    state.data.activeGoalGroupId = nextGroup.id;
+  }
+
+  saveData();
+  renderGoals();
+  renderCalendar();
+}
+
+function addGoalSection(title = "Goals") {
   getGoalSections().push({ id: makeId("section"), title, goals: [] });
   saveData();
   renderGoals();
+}
+
+function addGoalSectionFromButton() {
+  queueUndo("goal section");
+  addGoalSection();
 }
 
 function moveGoalSection(draggedId, targetId) {
@@ -722,7 +846,7 @@ function removeOldData() {
     calendarDays: Object.keys(state.data.calendarNotes).length,
     markerDays: Object.keys(state.data.dayEmojis).length,
     journalEntries: state.data.journalEntries.length,
-    datedGoals: getGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
+    datedGoals: getAllGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
   };
 
   Object.keys(state.data.calendarNotes).forEach((dateKey) => {
@@ -738,7 +862,7 @@ function removeOldData() {
   });
 
   state.data.journalEntries = state.data.journalEntries.filter((entry) => !entry.date || !isDateKeyBefore(entry.date, cutoffDate));
-  getGoalSections().forEach((section) => {
+  getAllGoalSections().forEach((section) => {
     section.goals = section.goals.filter((goal) => !goal.dueDate || !isDateKeyBefore(goal.dueDate, cutoffDate));
   });
 
@@ -746,7 +870,7 @@ function removeOldData() {
     calendarDays: Object.keys(state.data.calendarNotes).length,
     markerDays: Object.keys(state.data.dayEmojis).length,
     journalEntries: state.data.journalEntries.length,
-    datedGoals: getGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
+    datedGoals: getAllGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
   };
 
   saveData();
@@ -953,7 +1077,7 @@ function moveCalendarTask(sourceDateKey, noteId, targetDateKey) {
 }
 
 function moveGoalTaskDate(sectionId, goalId, targetDateKey) {
-  const section = getGoalSections().find((item) => item.id === sectionId);
+  const section = getAllGoalSections().find((item) => item.id === sectionId);
   const goal = section?.goals.find((item) => item.id === goalId);
   if (!goal || goal.dueDate === targetDateKey) return;
 
@@ -967,7 +1091,7 @@ function moveGoalTaskDate(sectionId, goalId, targetDateKey) {
 }
 
 function getGoalsForDate(dateKey) {
-  return getGoalSections().flatMap((section) =>
+  return getAllGoalSections().flatMap((section) =>
     section.goals.filter((goal) => goal.dueDate === dateKey).map((goal) => ({ section, goal })),
   );
 }
@@ -1028,7 +1152,15 @@ function makeCalendarGoalTask(goalMatch, variant) {
   source.className = "goal-source-label";
   source.textContent = "Goal";
 
-  task.append(checkbox, input, source);
+  const handleSubtaskChange = () => {
+    saveData();
+    renderCalendar();
+    renderSelectedDateNotes();
+    renderGoals();
+  };
+
+  task.append(checkbox, input, makeSubtaskAddButton(goal, "goal", handleSubtaskChange), source);
+  task.append(makeSubtaskPanel(goal, "goal", handleSubtaskChange));
   return task;
 }
 
@@ -1110,7 +1242,18 @@ function makeTaskRow(note, dateKey, variant) {
     deleteCalendarTask(dateKey, note.id);
   });
 
-  task.append(checkbox, input, deleteButton);
+  const handleSubtaskChange = () => {
+    saveData();
+    renderCalendar();
+    renderSelectedDateNotes();
+  };
+
+  const actions = document.createElement("div");
+  actions.className = "calendar-task-actions";
+  actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
+
+  task.append(checkbox, input, actions);
+  task.append(makeSubtaskPanel(note, "calendar task", handleSubtaskChange));
   return task;
 }
 
@@ -1131,6 +1274,109 @@ function makeTaskDragHandle(type, details) {
   });
   handle.addEventListener("dragend", clearCalendarTaskDrag);
   return handle;
+}
+
+function getSubtasks(item) {
+  if (!Array.isArray(item.subtasks)) {
+    item.subtasks = [];
+  }
+  return item.subtasks;
+}
+
+function makeSubtaskPanel(parent, ownerLabel, afterChange) {
+  const panel = document.createElement("div");
+  panel.className = "subtask-panel";
+
+  const subtasks = getSubtasks(parent);
+  if (subtasks.length) {
+    const list = document.createElement("div");
+    list.className = "subtask-list";
+    subtasks.forEach((subtask) => list.append(makeSubtaskRow(parent, subtask, ownerLabel, afterChange)));
+    panel.append(list);
+  }
+
+  return panel;
+}
+
+function makeSubtaskAddButton(parent, ownerLabel, afterChange) {
+  const button = document.createElement("button");
+  button.className = "subtask-add-button";
+  button.type = "button";
+  button.textContent = "+";
+  button.setAttribute("aria-label", `Add mini task under ${ownerLabel}`);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const subtasks = getSubtasks(parent);
+    const subtask = { id: makeId("subtask"), text: "", done: false };
+    queueUndo(`${ownerLabel} mini task`);
+    subtasks.push(subtask);
+    afterChange();
+    window.requestAnimationFrame(() => {
+      const input = document.querySelector(`[data-subtask-id="${subtask.id}"] .subtask-text-input`);
+      input?.focus();
+    });
+  });
+  return button;
+}
+
+function makeSubtaskRow(parent, subtask, ownerLabel, afterChange) {
+  const row = document.createElement("div");
+  row.className = "subtask-row";
+  row.dataset.subtaskId = subtask.id;
+  row.classList.toggle("is-done", Boolean(subtask.done));
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = Boolean(subtask.done);
+  checkbox.setAttribute("aria-label", "Mark mini task complete");
+  checkbox.addEventListener("change", () => {
+    queueUndo(`${ownerLabel} mini task status`);
+    subtask.done = checkbox.checked;
+    afterChange();
+  });
+
+  const input = document.createElement("input");
+  input.className = "subtask-text-input";
+  input.type = "text";
+  input.value = subtask.text;
+  input.setAttribute("aria-label", "Edit mini task");
+  const commitInput = () => {
+    const nextText = input.value.trim();
+    const subtasks = getSubtasks(parent);
+    if (!subtasks.some((item) => item.id === subtask.id)) return;
+    if (!nextText) {
+      queueUndo(`${ownerLabel} mini task deletion`);
+      parent.subtasks = subtasks.filter((item) => item.id !== subtask.id);
+    } else if (subtask.text !== nextText) {
+      queueUndo(`${ownerLabel} mini task edit`);
+      subtask.text = nextText;
+    } else {
+      return;
+    }
+    afterChange();
+  };
+  input.addEventListener("change", commitInput);
+  input.addEventListener("blur", commitInput);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      input.blur();
+    }
+  });
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "subtask-delete-button";
+  deleteButton.type = "button";
+  deleteButton.textContent = "x";
+  deleteButton.setAttribute("aria-label", "Delete mini task");
+  deleteButton.addEventListener("click", () => {
+    queueUndo(`${ownerLabel} mini task deletion`);
+    parent.subtasks = getSubtasks(parent).filter((item) => item.id !== subtask.id);
+    afterChange();
+  });
+
+  row.append(checkbox, input, deleteButton);
+  return row;
 }
 
 function renderSelectedDateNotes() {
@@ -1222,10 +1468,11 @@ function filteredJournalEntries() {
 
 function renderGoals() {
   els.goalSections.innerHTML = "";
+  renderGoalGroupTabs();
   const sections = getGoalSections();
 
   if (!sections.length) {
-    els.goalSections.append(emptyState("Add a section."));
+    els.goalSections.append(makeGoalSectionAddButton());
     return;
   }
 
@@ -1233,6 +1480,7 @@ function renderGoals() {
     const fragment = els.goalSectionTemplate.content.cloneNode(true);
     const card = fragment.querySelector(".goal-section");
     const sectionHeader = fragment.querySelector("header");
+    const sectionDragHandle = fragment.querySelector(".goal-section-drag-handle");
     const titleInput = fragment.querySelector(".section-title-input");
     const deleteSectionButton = fragment.querySelector("[data-action='delete-section']");
     const goalForm = fragment.querySelector(".goal-form");
@@ -1240,20 +1488,17 @@ function renderGoals() {
     const goalList = fragment.querySelector(".goal-list");
 
     card.dataset.sectionId = section.id;
-    sectionHeader.draggable = true;
+    sectionDragHandle.draggable = true;
     titleInput.value = section.title;
-    sectionHeader.addEventListener("dragstart", (event) => {
-      if (event.target.closest("input, button, select, textarea")) {
-        event.preventDefault();
-        return;
-      }
-
+    titleInput.spellcheck = false;
+    requestAnimationFrame(() => resizeWrappingTextbox(titleInput));
+    sectionDragHandle.addEventListener("dragstart", (event) => {
       state.draggingGoalSectionId = section.id;
       card.classList.add("is-dragging");
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", section.id);
     });
-    sectionHeader.addEventListener("dragend", () => {
+    sectionDragHandle.addEventListener("dragend", () => {
       state.draggingGoalSectionId = null;
       card.classList.remove("is-dragging");
       els.goalSections.querySelectorAll(".is-drop-target").forEach((item) => item.classList.remove("is-drop-target"));
@@ -1272,16 +1517,37 @@ function renderGoals() {
       moveGoalSection(event.dataTransfer.getData("text/plain") || state.draggingGoalSectionId, section.id);
     });
 
-    titleInput.addEventListener("change", () => {
-      if ((titleInput.value.trim() || "Untitled") === section.title) return;
+    titleInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        titleInput.blur();
+      }
+      if (event.key === "Escape") {
+        titleInput.value = section.title;
+        resizeWrappingTextbox(titleInput);
+        titleInput.blur();
+      }
+    });
+    titleInput.addEventListener("input", () => {
+      if (titleInput.value.length > 48) {
+        titleInput.value = titleInput.value.slice(0, 48);
+        titleInput.setSelectionRange(titleInput.value.length, titleInput.value.length);
+      }
+      resizeWrappingTextbox(titleInput);
+    });
+    titleInput.addEventListener("blur", () => {
+      const clean = titleInput.value.replace(/\s+/g, " ").trim().slice(0, 48) || "Untitled";
+      titleInput.value = clean;
+      resizeWrappingTextbox(titleInput);
+      if (clean === section.title) return;
       queueUndo("goal section title");
-      section.title = titleInput.value.trim() || "Untitled";
+      section.title = clean;
       saveData();
     });
 
     deleteSectionButton.addEventListener("click", () => {
       queueUndo("goal section deletion");
-      state.data.goalSections = sections.filter((item) => item.id !== section.id);
+      getActiveGoalGroup().sections = sections.filter((item) => item.id !== section.id);
       saveData();
       renderGoals();
     });
@@ -1291,7 +1557,7 @@ function renderGoals() {
       const text = goalInput.value.trim();
       if (!text) return;
       queueUndo("goal");
-      section.goals.push({ id: makeId("goal"), text, done: false, dueDate: "" });
+      section.goals.push({ id: makeId("goal"), text, done: false, dueDate: "", subtasks: [] });
       goalInput.value = "";
       saveData();
       renderGoals();
@@ -1304,6 +1570,141 @@ function renderGoals() {
 
     els.goalSections.append(card);
   });
+
+  els.goalSections.append(makeGoalSectionAddButton());
+}
+
+function makeGoalSectionAddButton() {
+  const button = document.createElement("button");
+  button.className = "goal-section-add";
+  button.type = "button";
+  button.textContent = "+";
+  button.setAttribute("aria-label", "Add goal box");
+  button.addEventListener("click", addGoalSectionFromButton);
+  return button;
+}
+
+function moveCaretToEnd(element) {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function resizeWrappingTextbox(input) {
+  input.style.height = "auto";
+  input.style.height = `${input.scrollHeight}px`;
+}
+
+function enableDoubleClickInputEdit(input, { trigger = input, onUnlock } = {}) {
+  const lock = () => {
+    input.readOnly = true;
+    input.classList.remove("is-editing");
+    input.classList.add("is-locked-edit");
+  };
+  const unlock = () => {
+    input.readOnly = false;
+    input.classList.add("is-editing");
+    input.classList.remove("is-locked-edit");
+    input.focus();
+    input.setSelectionRange?.(input.value.length, input.value.length);
+    onUnlock?.();
+  };
+
+  lock();
+
+  trigger.addEventListener("dblclick", (event) => {
+    if (event.target.closest("button")) return;
+    event.stopPropagation();
+    unlock();
+  });
+  input.addEventListener("blur", lock);
+}
+
+function renderGoalGroupTabs() {
+  ensureGoalGroups();
+  els.goalGroupTabs.innerHTML = "";
+
+  state.data.goalGroups.forEach((group) => {
+    const tab = document.createElement("div");
+    tab.className = "goal-group-tab";
+    tab.classList.toggle("is-active", group.id === state.data.activeGoalGroupId);
+    tab.dataset.groupId = group.id;
+
+    const input = document.createElement("textarea");
+    input.className = "goal-group-name";
+    input.rows = 1;
+    input.spellcheck = false;
+    input.maxLength = 36;
+    input.value = group.title;
+    input.setAttribute("aria-label", `Goal area name: ${group.title}`);
+    enableDoubleClickInputEdit(input, { trigger: tab, onUnlock: () => resizeWrappingTextbox(input) });
+
+    const activateGroup = () => {
+      if (group.id === state.data.activeGoalGroupId) return false;
+      state.data.activeGoalGroupId = group.id;
+      saveData();
+      renderGoals();
+      return true;
+    };
+
+    tab.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      if (!activateGroup()) {
+        input.focus();
+      }
+    });
+    input.addEventListener("focus", activateGroup);
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      }
+      if (event.key === "Escape") {
+        input.value = group.title;
+        resizeWrappingTextbox(input);
+        input.blur();
+      }
+    });
+    input.addEventListener("input", () => {
+      resizeWrappingTextbox(input);
+    });
+    input.addEventListener("blur", () => {
+      const clean = input.value.replace(/\s+/g, " ").trim().slice(0, 36) || defaultGoalGroupName;
+      input.value = clean;
+      resizeWrappingTextbox(input);
+      if (clean === group.title) return;
+      queueUndo("goal area rename");
+      group.title = clean;
+      saveData();
+      renderGoalGroupTabs();
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "goal-group-delete";
+    deleteButton.type = "button";
+    deleteButton.textContent = "x";
+    deleteButton.setAttribute("aria-label", `Delete ${group.title} goal area`);
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteActiveGoalGroup(group.id);
+    });
+
+    tab.append(input, deleteButton);
+    els.goalGroupTabs.append(tab);
+    resizeWrappingTextbox(input);
+  });
+
+  const addButton = document.createElement("button");
+  addButton.className = "goal-group-add";
+  addButton.type = "button";
+  addButton.textContent = "+";
+  addButton.setAttribute("aria-label", "Add goal area");
+  addButton.addEventListener("click", addGoalGroup);
+  els.goalGroupTabs.append(addButton);
 }
 
 function renderGoalItem(section, goal) {
@@ -1409,7 +1810,16 @@ function renderGoalItem(section, goal) {
 
   const textWrap = document.createElement("div");
   textWrap.className = "goal-text-wrap";
-  textWrap.append(text, dateBadge);
+  const goalLine = document.createElement("div");
+  goalLine.className = "goal-title-row";
+  const handleSubtaskChange = () => {
+    saveData();
+    renderGoals();
+    renderCalendar();
+    renderSelectedDateNotes();
+  };
+  goalLine.append(text, dateBadge, makeSubtaskAddButton(goal, "goal", handleSubtaskChange));
+  textWrap.append(goalLine, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
 
   item.append(checkbox, textWrap, menu);
   return item;

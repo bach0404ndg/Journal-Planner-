@@ -79,14 +79,7 @@
 
       <section class="view" id="goalsView" aria-label="Goals">
         <div class="goals-layout">
-          <section class="quick-add-panel" aria-label="Add goal section">
-            <form id="sectionForm" class="inline-form">
-              <label>
-                <span>Section name</span>
-                <input id="sectionNameInput" type="text" placeholder="New section name and press Enter">
-              </label>
-            </form>
-          </section>
+          <div class="goal-group-tabs" id="goalGroupTabs" aria-label="Goal areas"></div>
           <div class="goal-sections" id="goalSections"></div>
         </div>
       </section>
@@ -166,7 +159,8 @@
     <template id="goalSectionTemplate">
       <article class="goal-section">
         <header>
-          <input class="section-title-input" type="text" aria-label="Goal section title">
+          <span class="goal-section-drag-handle" aria-label="Drag goal box" role="button" tabindex="0"></span>
+          <textarea class="section-title-input" rows="1" aria-label="Goal section title"></textarea>
           <button class="icon-button danger" type="button" data-action="delete-section" aria-label="Delete section">x</button>
         </header>
         <form class="goal-form">
