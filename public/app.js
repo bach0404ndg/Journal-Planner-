@@ -1787,11 +1787,14 @@ function renderGoalItem(section, goal) {
     renderCalendar();
   });
 
-  const text = document.createElement("input");
+  const text = document.createElement("textarea");
   text.className = "goal-text-input";
-  text.type = "text";
+  text.rows = 1;
   text.value = goal.text;
   text.setAttribute("aria-label", "Edit goal");
+  text.addEventListener("input", () => {
+    resizeWrappingTextbox(text);
+  });
   text.addEventListener("change", () => {
     const nextText = text.value.trim();
     if (!nextText) {
@@ -1871,10 +1874,11 @@ function renderGoalItem(section, goal) {
     renderSelectedDateNotes();
   };
   actions.append(makeSubtaskAddButton(goal, "goal", handleSubtaskChange), dateInput, deleteButton);
-  goalLine.append(text, dateBadge);
-  textWrap.append(goalLine, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
+  goalLine.append(text);
+  textWrap.append(goalLine, dateBadge, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
 
   item.append(checkbox, textWrap, actions);
+  resizeWrappingTextbox(text);
   return item;
 }
 

@@ -1213,17 +1213,27 @@ textarea:focus {
 }
 
 .goal-text-input {
+  display: block;
+  width: 100%;
   min-height: 30px;
   padding: 3px 6px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: var(--ink);
+  font-family: inherit;
+  font-size: inherit;
   font-weight: 700;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  resize: none;
+  white-space: pre-wrap;
 }
 
 .goal-date-badge {
   width: fit-content;
+  margin-top: -2px;
   padding: 0;
   color: var(--green-meta);
   background: transparent;
