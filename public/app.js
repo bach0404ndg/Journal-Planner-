@@ -30,6 +30,16 @@ const paletteOptions = [
   { id: "brick", name: "Brick", color: "#9f4f37" },
 ];
 
+const calendarTaskColors = [
+  { id: "", name: "", color: "rgba(22, 51, 33, 0.24)", tint: "rgba(255, 255, 255, 0.56)" },
+  { id: "green", name: "Green", color: "#08742b", tint: "rgba(8, 116, 43, 0.1)" },
+  { id: "yellow", name: "Yellow", color: "#d99a14", tint: "rgba(217, 154, 20, 0.14)" },
+  { id: "coral", name: "Coral", color: "#d45b4c", tint: "rgba(212, 91, 76, 0.12)" },
+  { id: "olive", name: "Olive", color: "#6f7d35", tint: "rgba(111, 125, 53, 0.12)" },
+  { id: "rose", name: "Rose", color: "#be3a5b", tint: "rgba(190, 58, 91, 0.11)" },
+  { id: "brick", name: "Brick", color: "#9f4f37", tint: "rgba(159, 79, 55, 0.11)" },
+];
+
 const emojiOptions = [
   { emoji: "⭐", label: "Star" },
   { emoji: "🔥", label: "Fire" },
@@ -39,6 +49,9 @@ const emojiOptions = [
   { emoji: "📚", label: "Study" },
   { emoji: "✈️", label: "Travel" },
   { emoji: "🌱", label: "Growth" },
+  { emoji: "🙂", label: "Happy" },
+  { emoji: "😐", label: "Neutral" },
+  { emoji: "☹️", label: "Sad" },
 ];
 
 const state = {
@@ -48,6 +61,8 @@ const state = {
   range: "week",
   editingJournalId: null,
   draggingGoalSectionId: null,
+  draggingGoalGroupId: null,
+  draggingSpecialTaskId: null,
   draggingCalendarTask: null,
   undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
@@ -59,10 +74,13 @@ const els = {
   yearInput: document.querySelector("#yearInput"),
   weekdayRow: document.querySelector("#weekdayRow"),
   calendarGrid: document.querySelector("#calendarGrid"),
+  specialTaskTracker: document.querySelector("#specialTaskTracker"),
   selectedDateInput: document.querySelector("#selectedDateInput"),
   calendarRemoveOldDataButton: document.querySelector("#calendarRemoveOldDataButton"),
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
+  addSpecialTaskButton: document.querySelector("#addSpecialTaskButton"),
+  specialTaskList: document.querySelector("#specialTaskList"),
   emojiPalette: document.querySelector("#emojiPalette"),
   paletteSelect: document.querySelector("#paletteSelect"),
   selectedDateNotes: document.querySelector("#selectedDateNotes"),
@@ -106,6 +124,7 @@ function loadData() {
       const goalGroups = normalizeGoalGroups(saved.goalGroups, goalSections);
       return {
         calendarNotes: normalizeCalendarNotes(saved.calendarNotes),
+        savedCalendarTasks: normalizeSavedCalendarTasks(saved.savedCalendarTasks),
         dayEmojis: saved.dayEmojis || {},
         goalSections,
         goalGroups,
@@ -123,6 +142,7 @@ function loadData() {
 
   return {
     calendarNotes: {},
+    savedCalendarTasks: [],
     dayEmojis: {},
     goalSections: [],
     goalGroups: [{ id: makeId("goal-group"), title: defaultGoalGroupName, sections: [] }],
@@ -247,6 +267,24 @@ function normalizeCalendarNotes(savedNotes) {
   );
 }
 
+function normalizeSavedCalendarTasks(savedTasks) {
+  if (!Array.isArray(savedTasks)) return [];
+
+  const seen = new Set();
+  return savedTasks
+    .map((task) => ({
+      id: task.id || makeId("saved-task"),
+      text: String(task.text || "").trim(),
+      color: normalizeCalendarTaskColor(task.color),
+    }))
+    .filter((task) => {
+      const key = task.text.toLowerCase();
+      if (!task.text || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 function normalizeGoalSection(section) {
   return {
     id: section.id || makeId("section"),
@@ -267,6 +305,8 @@ function normalizeTask(task) {
     id: task.id || makeId("task"),
     text: task.text || "",
     done: Boolean(task.done),
+    color: normalizeCalendarTaskColor(task.color),
+    specialTaskId: task.specialTaskId || "",
     subtasks: normalizeSubtasks(task.subtasks),
   };
 }
@@ -352,6 +392,10 @@ function normalizePalette(savedPalette) {
   return paletteOptions.some((palette) => palette.id === savedPalette) ? savedPalette : "green";
 }
 
+function normalizeCalendarTaskColor(savedColor) {
+  return calendarTaskColors.some((color) => color.id === savedColor) ? savedColor : "";
+}
+
 function normalizeJournalLogWidth(savedWidth) {
   const width = Number(savedWidth);
   if (!Number.isFinite(width)) return defaultJournalLogWidth;
@@ -410,6 +454,7 @@ function init() {
   els.journalDate.value = toDateKey(now);
   els.journalTime.value = now.toTimeString().slice(0, 5);
   renderPaletteOptions();
+  renderSpecialTasks();
   applyJournalLayout();
 
   bindEvents();
@@ -512,12 +557,22 @@ function bindEvents() {
 
     queueUndo("calendar task");
     const notes = state.data.calendarNotes[state.selectedDate] || [];
-    notes.push({ id: makeId("note"), text, done: false, subtasks: [] });
+    notes.push({
+      id: makeId("note"),
+      text,
+      done: false,
+      color: "",
+      subtasks: [],
+    });
     state.data.calendarNotes[state.selectedDate] = notes;
     els.calendarNoteInput.value = "";
     saveData();
     renderCalendar();
     renderSelectedDateNotes();
+  });
+
+  els.addSpecialTaskButton.addEventListener("click", () => {
+    addSpecialTask();
   });
 
   els.journalForm.addEventListener("submit", (event) => {
@@ -644,6 +699,273 @@ function renderPaletteOptions() {
     els.paletteSelect.append(makeOption(palette.id, palette.name));
   });
   els.paletteSelect.value = normalizePalette(state.data.palette);
+}
+
+function getCalendarTaskColor(colorId) {
+  return calendarTaskColors.find((color) => color.id === normalizeCalendarTaskColor(colorId)) || calendarTaskColors[0];
+}
+
+function renderSpecialTasks() {
+  els.specialTaskList.innerHTML = "";
+
+  state.data.savedCalendarTasks.forEach((task) => {
+    els.specialTaskList.append(makeSpecialTaskChip(task));
+  });
+}
+
+function makeSpecialTaskChip(task) {
+  const chip = document.createElement("div");
+  chip.className = "special-task-chip";
+  chip.dataset.taskId = task.id;
+  const color = getCalendarTaskColor(task.color);
+  chip.style.setProperty("--task-color", color.color);
+  chip.style.setProperty("--task-tint", color.tint);
+  let clickTimer = null;
+
+  const dragHandle = document.createElement("span");
+  dragHandle.className = "special-task-drag-handle";
+  dragHandle.draggable = true;
+  dragHandle.role = "button";
+  dragHandle.tabIndex = 0;
+  dragHandle.dataset.noEdit = "true";
+  dragHandle.setAttribute("aria-label", "Move special task");
+  dragHandle.addEventListener("click", (event) => event.stopPropagation());
+  dragHandle.addEventListener("dragstart", (event) => {
+    state.draggingSpecialTaskId = task.id;
+    chip.classList.add("is-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", task.id);
+  });
+  dragHandle.addEventListener("dragend", clearSpecialTaskDrag);
+
+  chip.addEventListener("dragover", (event) => {
+    if (!state.draggingSpecialTaskId || state.draggingSpecialTaskId === task.id) return;
+    event.preventDefault();
+    chip.classList.add("is-drop-target");
+  });
+  chip.addEventListener("dragleave", () => {
+    chip.classList.remove("is-drop-target");
+  });
+  chip.addEventListener("drop", (event) => {
+    event.preventDefault();
+    chip.classList.remove("is-drop-target");
+    moveSpecialTask(event.dataTransfer.getData("text/plain") || state.draggingSpecialTaskId, task.id);
+    clearSpecialTaskDrag();
+  });
+
+  const nameInput = document.createElement("textarea");
+  nameInput.className = "special-task-name";
+  nameInput.rows = 1;
+  nameInput.value = task.text;
+  nameInput.title = "Click to add. Double-click to edit.";
+  nameInput.setAttribute("aria-label", `Special task: ${task.text}`);
+  enableDoubleClickInputEdit(nameInput, { onUnlock: () => resizeSpecialTaskName(nameInput) });
+  nameInput.addEventListener("input", () => {
+    resizeSpecialTaskName(nameInput);
+  });
+  nameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      nameInput.blur();
+    }
+    if (event.key === "Escape") {
+      nameInput.value = task.text;
+      resizeSpecialTaskName(nameInput);
+      nameInput.blur();
+    }
+  });
+  nameInput.addEventListener("blur", () => {
+    saveSpecialTaskName(task.id, nameInput.value);
+  });
+  chip.addEventListener("click", (event) => {
+    if (!nameInput.readOnly || event.target.closest(".special-task-color-menu, .special-task-remove, .special-task-drag-handle")) return;
+    if (event.detail > 1) return;
+    clickTimer = window.setTimeout(() => addSpecialTaskToSelectedDate(task), 220);
+  });
+  chip.addEventListener("dblclick", (event) => {
+    if (event.target.closest(".special-task-color-menu, .special-task-remove, .special-task-drag-handle")) return;
+    event.preventDefault();
+    if (clickTimer) {
+      window.clearTimeout(clickTimer);
+      clickTimer = null;
+    }
+  });
+
+  const colorMenu = document.createElement("details");
+  colorMenu.className = "special-task-color-menu";
+  const colorSummary = document.createElement("summary");
+  colorSummary.setAttribute("aria-label", "Choose special task color");
+  colorSummary.title = "Choose color";
+  colorSummary.style.setProperty("--task-color", color.color);
+
+  const colorItems = document.createElement("div");
+  colorItems.className = "special-task-color-items";
+  colorItems.append(makeSpecialTaskColorGrid(task, colorMenu));
+  colorMenu.append(colorSummary, colorItems);
+
+  const removeButton = document.createElement("button");
+  removeButton.className = "special-task-remove";
+  removeButton.type = "button";
+  removeButton.textContent = "x";
+  removeButton.setAttribute("aria-label", "Remove special task");
+  removeButton.addEventListener("click", () => {
+    removeSpecialTask(task.id);
+  });
+
+  chip.append(dragHandle, nameInput, colorMenu, removeButton);
+  resizeSpecialTaskNameSoon(nameInput);
+  return chip;
+}
+
+function makeSpecialTaskColorGrid(task, menu) {
+  const grid = document.createElement("div");
+  grid.className = "special-task-color-grid";
+
+  calendarTaskColors.forEach((color) => {
+    const button = document.createElement("button");
+    button.className = "special-task-color";
+    button.classList.toggle("is-active", normalizeCalendarTaskColor(task.color) === color.id);
+    button.type = "button";
+    button.title = color.name || "Default";
+    button.setAttribute("aria-label", color.name ? `Set ${color.name}` : "Set default color");
+    button.style.setProperty("--task-color", color.color);
+    button.addEventListener("click", () => {
+      menu.open = false;
+      updateSpecialTaskColor(task.id, color.id);
+    });
+    grid.append(button);
+  });
+
+  return grid;
+}
+
+function addSpecialTask() {
+  const name = window.prompt("Special task name");
+  const text = name?.trim().slice(0, 80);
+  if (!text) return;
+
+  if (hasSpecialTaskName(text)) return;
+
+  queueUndo("special task");
+  state.data.savedCalendarTasks.push({ id: makeId("saved-task"), text, color: "" });
+  state.data.savedCalendarTasks = normalizeSavedCalendarTasks(state.data.savedCalendarTasks);
+  saveData();
+  renderSpecialTasks();
+}
+
+function addSpecialTaskToSelectedDate(task) {
+  if (!state.selectedDate) return;
+
+  const notes = state.data.calendarNotes[state.selectedDate] || [];
+  if (notes.some((note) => note.specialTaskId === task.id)) return;
+
+  queueUndo("calendar special task");
+  notes.push({
+    id: makeId("note"),
+    text: task.text,
+    done: false,
+    color: normalizeCalendarTaskColor(task.color),
+    specialTaskId: task.id,
+    subtasks: [],
+  });
+  state.data.calendarNotes[state.selectedDate] = notes;
+  saveData();
+  renderCalendar();
+  renderSelectedDateNotes();
+}
+
+function saveSpecialTaskName(taskId, value) {
+  const task = state.data.savedCalendarTasks.find((item) => item.id === taskId);
+  if (!task) return;
+
+  const text = value.trim().slice(0, 80);
+  if (!text) {
+    renderSpecialTasks();
+    return;
+  }
+  if (text === task.text) return;
+  if (hasSpecialTaskName(text, taskId)) {
+    renderSpecialTasks();
+    return;
+  }
+
+  queueUndo("special task edit");
+  task.text = text;
+  syncSpecialTaskInstances(task.id, { text });
+  state.data.savedCalendarTasks = normalizeSavedCalendarTasks(state.data.savedCalendarTasks);
+  saveData();
+  renderCalendar();
+  renderSelectedDateNotes();
+  renderSpecialTasks();
+}
+
+function updateSpecialTaskColor(taskId, colorId) {
+  const task = state.data.savedCalendarTasks.find((item) => item.id === taskId);
+  if (!task) return;
+  const nextColor = normalizeCalendarTaskColor(colorId);
+  if (task.color === nextColor) return;
+
+  queueUndo("special task color");
+  task.color = nextColor;
+  syncSpecialTaskInstances(task.id, { color: nextColor });
+  saveData();
+  renderCalendar();
+  renderSelectedDateNotes();
+  renderSpecialTasks();
+}
+
+function syncSpecialTaskInstances(taskId, updates) {
+  Object.values(state.data.calendarNotes).forEach((notes) => {
+    notes.forEach((note) => {
+      if (note.specialTaskId !== taskId) return;
+      if (Object.prototype.hasOwnProperty.call(updates, "text")) {
+        note.text = updates.text;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, "color")) {
+        note.color = normalizeCalendarTaskColor(updates.color);
+      }
+    });
+  });
+}
+
+function hasSpecialTaskName(text, exceptTaskId = "") {
+  const clean = text.toLowerCase();
+  return state.data.savedCalendarTasks.some((task) => task.id !== exceptTaskId && task.text.toLowerCase() === clean);
+}
+
+function moveSpecialTask(draggedId, targetId) {
+  if (!draggedId || !targetId || draggedId === targetId) return;
+
+  const tasks = state.data.savedCalendarTasks;
+  const fromIndex = tasks.findIndex((task) => task.id === draggedId);
+  const toIndex = tasks.findIndex((task) => task.id === targetId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  queueUndo("special task order");
+  const [movedTask] = tasks.splice(fromIndex, 1);
+  tasks.splice(toIndex, 0, movedTask);
+  saveData();
+  renderSpecialTasks();
+}
+
+function clearSpecialTaskDrag() {
+  state.draggingSpecialTaskId = null;
+  els.specialTaskList.querySelectorAll(".is-dragging, .is-drop-target").forEach((item) => {
+    item.classList.remove("is-dragging", "is-drop-target");
+  });
+}
+
+function removeSpecialTask(taskId) {
+  const task = state.data.savedCalendarTasks.find((item) => item.id === taskId);
+  if (!task) return;
+
+  const confirmed = window.confirm(`Remove "${task.text}" from special tasks?`);
+  if (!confirmed) return;
+
+  queueUndo("special task removal");
+  state.data.savedCalendarTasks = state.data.savedCalendarTasks.filter((item) => item.id !== taskId);
+  saveData();
+  renderSpecialTasks();
 }
 
 function applyJournalLayout() {
@@ -855,8 +1177,31 @@ function moveGoalSection(draggedId, targetId) {
   renderGoals();
 }
 
+function moveGoalGroup(draggedId, targetId) {
+  if (!draggedId || !targetId || draggedId === targetId) return;
+
+  const groups = state.data.goalGroups;
+  const fromIndex = groups.findIndex((group) => group.id === draggedId);
+  const toIndex = groups.findIndex((group) => group.id === targetId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  queueUndo("goal area order");
+  const [movedGroup] = groups.splice(fromIndex, 1);
+  groups.splice(toIndex, 0, movedGroup);
+  saveData();
+  renderGoals();
+}
+
+function clearGoalGroupDrag() {
+  state.draggingGoalGroupId = null;
+  els.goalGroupTabs.querySelectorAll(".is-dragging, .is-drop-target").forEach((item) => {
+    item.classList.remove("is-dragging", "is-drop-target");
+  });
+}
+
 function renderAll() {
   ensureStarterSections();
+  renderSpecialTasks();
   renderCalendar();
   renderGoals();
   renderJournal();
@@ -928,6 +1273,7 @@ function renderCalendar() {
   const { gridStart, totalDays } = getCalendarGridRange();
   els.calendarGrid.innerHTML = "";
   els.calendarGrid.classList.toggle("is-week-view", state.range === "week");
+  renderSpecialTaskTracker(gridStart, totalDays);
 
   const todayKey = toDateKey(new Date());
 
@@ -987,6 +1333,54 @@ function renderCalendar() {
   }
 
   renderSelectedDateNotes();
+}
+
+function renderSpecialTaskTracker(gridStart, totalDays) {
+  els.specialTaskTracker.innerHTML = "";
+
+  const counts = new Map();
+  const trackerStart = gridStart;
+  const trackerDays = totalDays;
+
+  if (state.range === "month") {
+    const label = document.createElement("span");
+    label.className = "special-task-count-period";
+    label.textContent = monthNames[state.month];
+    els.specialTaskTracker.append(label);
+  }
+
+  for (let index = 0; index < trackerDays; index += 1) {
+    const date = addDays(trackerStart, index);
+    if (state.range === "month" && date.getMonth() !== state.month) continue;
+
+    const dateKey = toDateKey(date);
+    const countedToday = new Set();
+    (state.data.calendarNotes[dateKey] || []).forEach((note) => {
+      if (!note.specialTaskId || !note.done || countedToday.has(note.specialTaskId)) return;
+      countedToday.add(note.specialTaskId);
+      counts.set(note.specialTaskId, (counts.get(note.specialTaskId) || 0) + 1);
+    });
+  }
+
+  state.data.savedCalendarTasks.forEach((task) => {
+    const count = counts.get(task.id) || 0;
+    if (!count) return;
+
+    const color = getCalendarTaskColor(task.color);
+    const item = document.createElement("span");
+    item.className = "special-task-count";
+    item.style.setProperty("--task-color", color.color);
+    item.style.setProperty("--task-tint", color.tint);
+    const label = document.createElement("span");
+    label.className = "special-task-count-label";
+    label.textContent = task.text;
+    const number = document.createElement("span");
+    number.className = "special-task-count-number";
+    number.textContent = `: ${count}`;
+    item.title = `${count} completed in ${state.range === "week" ? "this week" : monthNames[state.month]}`;
+    item.append(label, number);
+    els.specialTaskTracker.append(item);
+  });
 }
 
 function getCalendarGridRange() {
@@ -1195,9 +1589,33 @@ function makeCalendarGoalTask(goalMatch, variant) {
     renderGoals();
   };
 
-  task.append(checkbox, input, makeSubtaskAddButton(goal, "goal", handleSubtaskChange), source);
+  if (variant === "calendar") {
+    task.append(checkbox, input, makeTaskDuplicateButton(goal.dueDate, "", () => duplicateGoalTaskToCalendar(goal)));
+  } else {
+    task.append(checkbox, input, makeSubtaskAddButton(goal, "goal", handleSubtaskChange), source);
+  }
   task.append(makeSubtaskPanel(goal, "goal", handleSubtaskChange));
   return task;
+}
+
+function duplicateGoalTaskToCalendar(goal) {
+  if (!goal.dueDate) return;
+
+  queueUndo("goal task duplicate");
+  const notes = state.data.calendarNotes[goal.dueDate] || [];
+  notes.push({
+    id: makeId("note"),
+    text: goal.text,
+    done: false,
+    color: "",
+    subtasks: [],
+  });
+  state.data.calendarNotes[goal.dueDate] = notes;
+  saveData();
+  renderCalendar();
+  if (goal.dueDate === state.selectedDate) {
+    renderSelectedDateNotes();
+  }
 }
 
 function deleteCalendarTask(dateKey, noteId) {
@@ -1231,10 +1649,47 @@ function updateCalendarTaskText(dateKey, noteId, text) {
   }
 }
 
+function duplicateCalendarTask(dateKey, noteId) {
+  const note = (state.data.calendarNotes[dateKey] || []).find((item) => item.id === noteId);
+  if (!note) return;
+
+  queueUndo("calendar task duplicate");
+  const duplicate = {
+    ...cloneData(note),
+    id: makeId("note"),
+    done: false,
+  };
+  state.data.calendarNotes[dateKey] = [...(state.data.calendarNotes[dateKey] || []), duplicate];
+  saveData();
+  renderCalendar();
+  if (dateKey === state.selectedDate) {
+    renderSelectedDateNotes();
+  }
+}
+
+function makeTaskDuplicateButton(dateKey, noteId, customDuplicate) {
+  const button = document.createElement("button");
+  button.className = "task-duplicate-button";
+  button.type = "button";
+  button.textContent = "□";
+  button.setAttribute("aria-label", "Duplicate task");
+  button.addEventListener("click", () => {
+    if (customDuplicate) {
+      customDuplicate();
+      return;
+    }
+    duplicateCalendarTask(dateKey, noteId);
+  });
+  return button;
+}
+
 function makeTaskRow(note, dateKey, variant) {
   const task = document.createElement("div");
   task.className = variant === "calendar" ? "note-pill calendar-task" : "mini-item calendar-task";
   task.classList.toggle("is-done", Boolean(note.done));
+  const color = getCalendarTaskColor(note.color);
+  task.style.setProperty("--task-color", color.color);
+  task.style.setProperty("--task-tint", color.tint);
   task.addEventListener("click", (event) => event.stopPropagation());
   task.append(makeTaskDragHandle("calendar-task", {
     dateKey,
@@ -1286,7 +1741,11 @@ function makeTaskRow(note, dateKey, variant) {
 
   const actions = document.createElement("div");
   actions.className = "calendar-task-actions";
-  actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
+  if (variant === "calendar") {
+    actions.append(makeTaskDuplicateButton(dateKey, note.id), deleteButton);
+  } else {
+    actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
+  }
 
   task.append(checkbox, input, actions);
   task.append(makeSubtaskPanel(note, "calendar task", handleSubtaskChange));
@@ -1711,6 +2170,58 @@ function resizeWrappingTextboxSoon(input) {
   window.requestAnimationFrame(() => resizeWrappingTextbox(input));
 }
 
+function resizeSpecialTaskName(input) {
+  const styles = window.getComputedStyle(input);
+  const measure = input.ownerDocument.createElement("span");
+  measure.textContent = input.value || " ";
+  measure.style.position = "absolute";
+  measure.style.visibility = "hidden";
+  measure.style.pointerEvents = "none";
+  measure.style.whiteSpace = "nowrap";
+  measure.style.font = styles.font;
+  measure.style.letterSpacing = styles.letterSpacing;
+  input.ownerDocument.body.append(measure);
+
+  const horizontalPadding =
+    Number.parseFloat(styles.paddingLeft || "0") + Number.parseFloat(styles.paddingRight || "0");
+  const nextWidth = Math.min(Math.max(Math.ceil(measure.scrollWidth + horizontalPadding + 2), 78), 250);
+  measure.remove();
+
+  input.style.width = `${nextWidth}px`;
+  resizeWrappingTextbox(input);
+}
+
+function resizeSpecialTaskNameSoon(input) {
+  resizeSpecialTaskName(input);
+  window.requestAnimationFrame(() => resizeSpecialTaskName(input));
+}
+
+function resizeGoalGroupName(input) {
+  const styles = window.getComputedStyle(input);
+  const measure = input.ownerDocument.createElement("span");
+  measure.textContent = input.value || " ";
+  measure.style.position = "absolute";
+  measure.style.visibility = "hidden";
+  measure.style.pointerEvents = "none";
+  measure.style.whiteSpace = "nowrap";
+  measure.style.font = styles.font;
+  measure.style.letterSpacing = styles.letterSpacing;
+  input.ownerDocument.body.append(measure);
+
+  const horizontalPadding =
+    Number.parseFloat(styles.paddingLeft || "0") + Number.parseFloat(styles.paddingRight || "0");
+  const nextWidth = Math.min(Math.max(Math.ceil(measure.scrollWidth + horizontalPadding + 2), 128), 310);
+  measure.remove();
+
+  input.style.width = `${nextWidth}px`;
+  resizeWrappingTextbox(input);
+}
+
+function resizeGoalGroupNameSoon(input) {
+  resizeGoalGroupName(input);
+  window.requestAnimationFrame(() => resizeGoalGroupName(input));
+}
+
 function resizeAllGoalTextboxesSoon() {
   window.requestAnimationFrame(() => {
     document.querySelectorAll(".goal-text-input, .section-title-input").forEach(resizeWrappingTextboxSoon);
@@ -1735,7 +2246,7 @@ function enableDoubleClickInputEdit(input, { trigger = input, onUnlock } = {}) {
   lock();
 
   trigger.addEventListener("dblclick", (event) => {
-    if (event.target.closest("button")) return;
+    if (event.target.closest("button, [data-no-edit='true']")) return;
     event.stopPropagation();
     unlock();
   });
@@ -1752,6 +2263,36 @@ function renderGoalGroupTabs() {
     tab.classList.toggle("is-active", group.id === state.data.activeGoalGroupId);
     tab.dataset.groupId = group.id;
 
+    const dragHandle = document.createElement("span");
+    dragHandle.className = "goal-group-drag-handle";
+    dragHandle.draggable = true;
+    dragHandle.role = "button";
+    dragHandle.tabIndex = 0;
+    dragHandle.dataset.noEdit = "true";
+    dragHandle.setAttribute("aria-label", `Move ${group.title} goal area`);
+    dragHandle.addEventListener("click", (event) => event.stopPropagation());
+    dragHandle.addEventListener("dragstart", (event) => {
+      state.draggingGoalGroupId = group.id;
+      tab.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", group.id);
+    });
+    dragHandle.addEventListener("dragend", clearGoalGroupDrag);
+    tab.addEventListener("dragover", (event) => {
+      if (!state.draggingGoalGroupId || state.draggingGoalGroupId === group.id) return;
+      event.preventDefault();
+      tab.classList.add("is-drop-target");
+    });
+    tab.addEventListener("dragleave", () => {
+      tab.classList.remove("is-drop-target");
+    });
+    tab.addEventListener("drop", (event) => {
+      event.preventDefault();
+      tab.classList.remove("is-drop-target");
+      moveGoalGroup(event.dataTransfer.getData("text/plain") || state.draggingGoalGroupId, group.id);
+      clearGoalGroupDrag();
+    });
+
     const input = document.createElement("textarea");
     input.className = "goal-group-name";
     input.rows = 1;
@@ -1759,7 +2300,7 @@ function renderGoalGroupTabs() {
     input.maxLength = 36;
     input.value = group.title;
     input.setAttribute("aria-label", `Goal area name: ${group.title}`);
-    enableDoubleClickInputEdit(input, { trigger: tab, onUnlock: () => resizeWrappingTextbox(input) });
+    enableDoubleClickInputEdit(input, { trigger: tab, onUnlock: () => resizeGoalGroupName(input) });
 
     const activateGroup = () => {
       if (group.id === state.data.activeGoalGroupId) return false;
@@ -1770,7 +2311,7 @@ function renderGoalGroupTabs() {
     };
 
     tab.addEventListener("click", (event) => {
-      if (event.target.closest("button")) return;
+      if (event.target.closest("button, [data-no-edit='true']")) return;
       if (!activateGroup()) {
         input.focus();
       }
@@ -1784,17 +2325,17 @@ function renderGoalGroupTabs() {
       }
       if (event.key === "Escape") {
         input.value = group.title;
-        resizeWrappingTextbox(input);
+        resizeGoalGroupName(input);
         input.blur();
       }
     });
     input.addEventListener("input", () => {
-      resizeWrappingTextbox(input);
+      resizeGoalGroupName(input);
     });
     input.addEventListener("blur", () => {
       const clean = input.value.replace(/\s+/g, " ").trim().slice(0, 36) || defaultGoalGroupName;
       input.value = clean;
-      resizeWrappingTextbox(input);
+      resizeGoalGroupName(input);
       if (clean === group.title) return;
       queueUndo("goal area rename");
       group.title = clean;
@@ -1812,9 +2353,9 @@ function renderGoalGroupTabs() {
       deleteActiveGoalGroup(group.id);
     });
 
-    tab.append(input, deleteButton);
+    tab.append(dragHandle, input, deleteButton);
     els.goalGroupTabs.append(tab);
-    resizeWrappingTextbox(input);
+    resizeGoalGroupNameSoon(input);
   });
 
   const addButton = document.createElement("button");

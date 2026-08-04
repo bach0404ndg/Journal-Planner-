@@ -52,6 +52,10 @@
               <div class="emoji-palette" id="emojiPalette"></div>
             </div>
             <form id="calendarNoteForm" class="stacked-form">
+              <div class="special-task-shelf" aria-label="Special calendar tasks">
+                <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
+                <div class="special-task-list" id="specialTaskList"></div>
+              </div>
               <label>
                 <span>Task</span>
                 <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
@@ -66,6 +70,7 @@
                 <button class="range-button" type="button" data-range="month">Monthly</button>
                 <button class="range-button is-active" type="button" data-range="week">Weekly</button>
               </div>
+              <div class="special-task-tracker" id="specialTaskTracker" aria-label="Special task counts"></div>
               <div class="calendar-nav-buttons" aria-label="Calendar navigation">
                 <button class="metadata-button calendar-arrow-button" type="button" id="calendarPrevButton" aria-label="Previous calendar range">&lt;</button>
                 <button class="metadata-button calendar-arrow-button" type="button" id="calendarNextButton" aria-label="Next calendar range">&gt;</button>
