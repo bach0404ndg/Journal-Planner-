@@ -1205,9 +1205,7 @@ textarea:focus {
 }
 
 .goal-title-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px;
+  display: block;
   align-items: center;
   min-width: 0;
 }
@@ -1215,17 +1213,20 @@ textarea:focus {
 .goal-text-input {
   display: block;
   width: 100%;
+  height: auto;
   min-height: 30px;
   padding: 3px 6px;
   border: 1px solid transparent;
   border-radius: 6px;
+  box-sizing: border-box;
   background: transparent;
   color: var(--ink);
+  field-sizing: content;
   font-family: inherit;
   font-size: inherit;
   font-weight: 700;
   line-height: 1.35;
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: anywhere;
   resize: none;
   white-space: pre-wrap;

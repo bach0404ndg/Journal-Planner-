@@ -1661,6 +1661,11 @@ function resizeWrappingTextbox(input) {
   input.style.height = `${input.scrollHeight}px`;
 }
 
+function resizeWrappingTextboxSoon(input) {
+  resizeWrappingTextbox(input);
+  window.requestAnimationFrame(() => resizeWrappingTextbox(input));
+}
+
 function enableDoubleClickInputEdit(input, { trigger = input, onUnlock } = {}) {
   const lock = () => {
     input.readOnly = true;
@@ -1793,7 +1798,7 @@ function renderGoalItem(section, goal) {
   text.value = goal.text;
   text.setAttribute("aria-label", "Edit goal");
   text.addEventListener("input", () => {
-    resizeWrappingTextbox(text);
+    resizeWrappingTextboxSoon(text);
   });
   text.addEventListener("change", () => {
     const nextText = text.value.trim();
@@ -1878,7 +1883,7 @@ function renderGoalItem(section, goal) {
   textWrap.append(goalLine, dateBadge, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
 
   item.append(checkbox, textWrap, actions);
-  resizeWrappingTextbox(text);
+  resizeWrappingTextboxSoon(text);
   return item;
 }
 
