@@ -22,18 +22,22 @@ const defaultJournalLogWidth = 58;
 const defaultGoalGroupName = "General";
 
 const paletteOptions = [
-  { id: "green", name: "Green", color: "#08742b" },
-  { id: "yellow", name: "Yellow", color: "#d99a14" },
-  { id: "coral", name: "Coral", color: "#d45b4c" },
-  { id: "olive", name: "Olive", color: "#6f7d35" },
-  { id: "rose", name: "Rose", color: "#be3a5b" },
-  { id: "brick", name: "Brick", color: "#9f4f37" },
-  { id: "mint", name: "Mint", color: "#1fa66a" },
-  { id: "tangerine", name: "Tangerine", color: "#f07822" },
-  { id: "berry", name: "Berry", color: "#e23d70" },
-  { id: "lavender", name: "Lavender", color: "#7b61d1" },
-  { id: "cocoa", name: "Cocoa", color: "#8a5a2b" },
-  { id: "ocean", name: "Ocean", color: "#1688a8" },
+  { id: "green", name: "Green", color: "#08742b", tint: "rgba(8, 116, 43, 0.1)" },
+  { id: "yellow", name: "Yellow", color: "#d99a14", tint: "rgba(217, 154, 20, 0.14)" },
+  { id: "coral", name: "Coral", color: "#d45b4c", tint: "rgba(212, 91, 76, 0.12)" },
+  { id: "olive", name: "Olive", color: "#6f7d35", tint: "rgba(111, 125, 53, 0.12)" },
+  { id: "rose", name: "Rose", color: "#be3a5b", tint: "rgba(190, 58, 91, 0.11)" },
+  { id: "brick", name: "Brick", color: "#9f4f37", tint: "rgba(159, 79, 55, 0.11)" },
+  { id: "mint", name: "Mint", color: "#1fa66a", tint: "rgba(31, 166, 106, 0.13)" },
+  { id: "tangerine", name: "Tangerine", color: "#f07822", tint: "rgba(240, 120, 34, 0.14)" },
+  { id: "berry", name: "Berry", color: "#e23d70", tint: "rgba(226, 61, 112, 0.12)" },
+  { id: "lavender", name: "Lavender", color: "#7b61d1", tint: "rgba(123, 97, 209, 0.12)" },
+  { id: "cocoa", name: "Cocoa", color: "#8a5a2b", tint: "rgba(138, 90, 43, 0.12)" },
+  { id: "ocean", name: "Ocean", color: "#1688a8", tint: "rgba(22, 136, 168, 0.12)" },
+  { id: "lemon", name: "Lemon", color: "#f3c63a", tint: "rgba(255, 241, 168, 0.44)" },
+  { id: "peach", name: "Peach", color: "#f08a5d", tint: "rgba(255, 211, 188, 0.38)" },
+  { id: "sky", name: "Sky", color: "#54a9e8", tint: "rgba(199, 230, 255, 0.4)" },
+  { id: "lilac", name: "Lilac", color: "#a985e8", tint: "rgba(226, 211, 255, 0.4)" },
 ];
 
 const calendarTaskColors = [
@@ -50,6 +54,30 @@ const calendarTaskColors = [
   { id: "lavender", name: "Lavender", color: "#7b61d1", tint: "rgba(123, 97, 209, 0.12)" },
   { id: "cocoa", name: "Cocoa", color: "#8a5a2b", tint: "rgba(138, 90, 43, 0.12)" },
   { id: "ocean", name: "Ocean", color: "#1688a8", tint: "rgba(22, 136, 168, 0.12)" },
+  { id: "lemon", name: "Lemon", color: "#f3c63a", tint: "rgba(255, 241, 168, 0.44)" },
+  { id: "peach", name: "Peach", color: "#f08a5d", tint: "rgba(255, 211, 188, 0.38)" },
+  { id: "sky", name: "Sky", color: "#54a9e8", tint: "rgba(199, 230, 255, 0.4)" },
+  { id: "lilac", name: "Lilac", color: "#a985e8", tint: "rgba(226, 211, 255, 0.4)" },
+];
+
+const goalPaperColors = [
+  { id: "", name: "Paper", color: "rgba(22, 51, 33, 0.24)", tint: "rgba(255, 255, 255, 0.28)" },
+  { id: "green", name: "Green", color: "#08742b", tint: "rgba(8, 116, 43, 0.16)" },
+  { id: "yellow", name: "Yellow", color: "#d99a14", tint: "rgba(217, 154, 20, 0.2)" },
+  { id: "coral", name: "Coral", color: "#d45b4c", tint: "rgba(212, 91, 76, 0.18)" },
+  { id: "olive", name: "Olive", color: "#6f7d35", tint: "rgba(111, 125, 53, 0.18)" },
+  { id: "rose", name: "Rose", color: "#be3a5b", tint: "rgba(190, 58, 91, 0.16)" },
+  { id: "brick", name: "Brick", color: "#9f4f37", tint: "rgba(159, 79, 55, 0.16)" },
+  { id: "mint", name: "Mint", color: "#1fa66a", tint: "rgba(31, 166, 106, 0.18)" },
+  { id: "tangerine", name: "Tangerine", color: "#f07822", tint: "rgba(240, 120, 34, 0.2)" },
+  { id: "berry", name: "Berry", color: "#e23d70", tint: "rgba(226, 61, 112, 0.17)" },
+  { id: "lavender", name: "Lavender", color: "#7b61d1", tint: "rgba(123, 97, 209, 0.17)" },
+  { id: "cocoa", name: "Cocoa", color: "#8a5a2b", tint: "rgba(138, 90, 43, 0.18)" },
+  { id: "ocean", name: "Ocean", color: "#1688a8", tint: "rgba(22, 136, 168, 0.18)" },
+  { id: "lemon", name: "Lemon", color: "#f3c63a", tint: "rgba(255, 241, 168, 0.48)" },
+  { id: "peach", name: "Peach", color: "#f08a5d", tint: "rgba(255, 211, 188, 0.46)" },
+  { id: "sky", name: "Sky", color: "#54a9e8", tint: "rgba(199, 230, 255, 0.44)" },
+  { id: "lilac", name: "Lilac", color: "#a985e8", tint: "rgba(226, 211, 255, 0.44)" },
 ];
 
 const emojiOptions = [
@@ -94,7 +122,8 @@ const els = {
   addSpecialTaskButton: document.querySelector("#addSpecialTaskButton"),
   specialTaskList: document.querySelector("#specialTaskList"),
   emojiPalette: document.querySelector("#emojiPalette"),
-  paletteSelect: document.querySelector("#paletteSelect"),
+  paletteMenu: document.querySelector("#paletteMenu"),
+  paletteOptions: document.querySelector("#paletteOptions"),
   selectedDateNotes: document.querySelector("#selectedDateNotes"),
   todayButton: document.querySelector("#todayButton"),
   calendarPrevButton: document.querySelector("#calendarPrevButton"),
@@ -230,6 +259,7 @@ function normalizeGoalSections(savedSections) {
           mergedSections.set(title, {
             id: section.id || makeId("section"),
             title,
+            color: normalizeGoalSectionColor(section.color),
             goals: [],
           });
         }
@@ -297,10 +327,19 @@ function normalizeSavedCalendarTasks(savedTasks) {
     });
 }
 
+function normalizeGoalSectionColor(colorId) {
+  return goalPaperColors.some((color) => color.id === colorId) ? colorId : "";
+}
+
+function getGoalPaperColor(colorId) {
+  return goalPaperColors.find((color) => color.id === normalizeGoalSectionColor(colorId)) || goalPaperColors[0];
+}
+
 function normalizeGoalSection(section) {
   return {
     id: section.id || makeId("section"),
     title: section.title || "Untitled",
+    color: normalizeGoalSectionColor(section.color),
     goals: Array.isArray(section.goals) ? section.goals.map(normalizeGoal) : [],
   };
 }
@@ -528,14 +567,6 @@ function bindEvents() {
     shiftCalendarRange(1);
   });
 
-  els.paletteSelect.addEventListener("change", () => {
-    if (normalizePalette(els.paletteSelect.value) === state.data.palette) return;
-    queueUndo("palette change");
-    state.data.palette = normalizePalette(els.paletteSelect.value);
-    saveData();
-    applyPalette();
-  });
-
   els.journalEntryToggle.addEventListener("click", () => {
     queueUndo("journal layout change");
     state.data.journalEntryCollapsed = !state.data.journalEntryCollapsed;
@@ -706,11 +737,59 @@ function applyPalette() {
 }
 
 function renderPaletteOptions() {
-  els.paletteSelect.innerHTML = "";
+  els.paletteOptions.innerHTML = "";
+  const currentPalette = paletteOptions.find((palette) => palette.id === normalizePalette(state.data.palette)) || paletteOptions[0];
+  els.paletteMenu.style.setProperty("--menu-color", currentPalette.color);
+  els.paletteMenu.style.setProperty("--menu-tint", currentPalette.tint);
+  els.paletteOptions.append(makeColorMenuLabel());
+  const grid = document.createElement("div");
+  grid.className = "color-menu-grid";
   paletteOptions.forEach((palette) => {
-    els.paletteSelect.append(makeOption(palette.id, palette.name));
+    const button = makeColorOptionButton({
+      name: palette.name,
+      color: palette.color,
+      tint: palette.tint,
+      active: palette.id === currentPalette.id,
+      ariaLabel: `Use ${palette.name} planner color`,
+      onClick: () => {
+        els.paletteMenu.open = false;
+        if (palette.id === state.data.palette) return;
+        queueUndo("palette change");
+        state.data.palette = normalizePalette(palette.id);
+        saveData();
+        applyPalette();
+        renderPaletteOptions();
+      },
+    });
+    grid.append(button);
   });
-  els.paletteSelect.value = normalizePalette(state.data.palette);
+  els.paletteOptions.append(grid);
+}
+
+function makeColorOptionButton({ name, color, tint = "rgba(255, 255, 255, 0.6)", active = false, ariaLabel, onClick }) {
+  const button = document.createElement("button");
+  button.className = "color-option";
+  button.classList.toggle("is-active", active);
+  button.type = "button";
+  button.style.setProperty("--option-color", color);
+  button.style.setProperty("--option-tint", tint);
+  button.setAttribute("aria-label", ariaLabel || `Choose ${name}`);
+  button.title = name;
+
+  const swatch = document.createElement("span");
+  swatch.className = "color-option-swatch";
+  swatch.setAttribute("aria-hidden", "true");
+
+  button.append(swatch);
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function makeColorMenuLabel() {
+  const label = document.createElement("span");
+  label.className = "color-menu-label";
+  label.textContent = "Color";
+  return label;
 }
 
 function getCalendarTaskColor(colorId) {
@@ -804,15 +883,20 @@ function makeSpecialTaskChip(task) {
   });
 
   const colorMenu = document.createElement("details");
-  colorMenu.className = "special-task-color-menu";
+  colorMenu.className = "special-task-color-menu color-menu";
   const colorSummary = document.createElement("summary");
   colorSummary.setAttribute("aria-label", "Choose special task color");
   colorSummary.title = "Choose color";
-  colorSummary.style.setProperty("--task-color", color.color);
+  colorSummary.style.setProperty("--menu-color", color.color);
+  colorSummary.style.setProperty("--menu-tint", color.tint);
+  const colorSwatch = document.createElement("span");
+  colorSwatch.className = "color-menu-current";
+  colorSwatch.setAttribute("aria-hidden", "true");
+  colorSummary.append(colorSwatch);
 
   const colorItems = document.createElement("div");
-  colorItems.className = "special-task-color-items";
-  colorItems.append(makeSpecialTaskColorGrid(task, colorMenu));
+  colorItems.className = "special-task-color-items color-menu-items";
+  colorItems.append(makeColorMenuLabel(), makeSpecialTaskColorGrid(task, colorMenu));
   colorMenu.append(colorSummary, colorItems);
 
   const removeButton = document.createElement("button");
@@ -831,20 +915,21 @@ function makeSpecialTaskChip(task) {
 
 function makeSpecialTaskColorGrid(task, menu) {
   const grid = document.createElement("div");
-  grid.className = "special-task-color-grid";
+  grid.className = "special-task-color-grid color-menu-grid";
 
   calendarTaskColors.forEach((color) => {
-    const button = document.createElement("button");
-    button.className = "special-task-color";
-    button.classList.toggle("is-active", normalizeCalendarTaskColor(task.color) === color.id);
-    button.type = "button";
-    button.title = color.name || "Default";
-    button.setAttribute("aria-label", color.name ? `Set ${color.name}` : "Set default color");
-    button.style.setProperty("--task-color", color.color);
-    button.addEventListener("click", () => {
-      menu.open = false;
-      updateSpecialTaskColor(task.id, color.id);
+    const button = makeColorOptionButton({
+      name: color.name || "Default",
+      color: color.color,
+      tint: color.tint,
+      active: normalizeCalendarTaskColor(task.color) === color.id,
+      ariaLabel: color.name ? `Set ${color.name}` : "Set default color",
+      onClick: () => {
+        menu.open = false;
+        updateSpecialTaskColor(task.id, color.id);
+      },
     });
+    button.classList.add("special-task-color");
     grid.append(button);
   });
 
@@ -1060,9 +1145,9 @@ function ensureStarterSections() {
   if (activeGroup.sections.length || getAllGoalSections().length) return;
 
   activeGroup.sections = [
-    { id: makeId("section"), title: "Priorities", goals: [] },
-    { id: makeId("section"), title: "Optional goals", goals: [] },
-    { id: makeId("section"), title: "Personal", goals: [] },
+    { id: makeId("section"), title: "Priorities", color: "", goals: [] },
+    { id: makeId("section"), title: "Optional goals", color: "", goals: [] },
+    { id: makeId("section"), title: "Personal", color: "", goals: [] },
   ];
   saveData();
 }
@@ -1125,6 +1210,18 @@ function moveGoalSectionToGroup(sectionId, targetGroupId) {
   renderSelectedDateNotes();
 }
 
+function updateGoalSectionColor(sectionId, colorId) {
+  const location = findGoalSectionLocation(sectionId);
+  if (!location) return;
+  const nextColor = normalizeGoalSectionColor(colorId);
+  if (location.section.color === nextColor) return;
+
+  queueUndo("goal box color");
+  location.section.color = nextColor;
+  saveData();
+  renderGoals();
+}
+
 function addGoalGroup() {
   const title = window.prompt("New goal area", "General");
   if (!title) return;
@@ -1164,7 +1261,7 @@ function deleteActiveGoalGroup(groupId = state.data.activeGoalGroupId) {
 }
 
 function addGoalSection(title = "Goals") {
-  getGoalSections().push({ id: makeId("section"), title, goals: [] });
+  getGoalSections().push({ id: makeId("section"), title, color: "", goals: [] });
   saveData();
   renderGoals();
 }
@@ -2004,10 +2101,14 @@ function renderGoals() {
     const goalList = fragment.querySelector(".goal-list");
 
     card.dataset.sectionId = section.id;
+    const paperColor = getGoalPaperColor(section.color);
+    card.style.setProperty("--goal-paper-bg", paperColor.tint);
+    card.style.setProperty("--goal-paper-accent", paperColor.color);
     sectionDragHandle.draggable = true;
     titleInput.value = section.title;
     titleInput.spellcheck = false;
     requestAnimationFrame(() => resizeWrappingTextbox(titleInput));
+    sectionHeader.insertBefore(makeGoalSectionColorMenu(section), sectionMoveMenu);
 
     const moveTargets = state.data.goalGroups.filter((group) => group.id !== state.data.activeGoalGroupId);
     sectionMoveMenu.hidden = !moveTargets.length;
@@ -2118,6 +2219,48 @@ function renderGoals() {
 
   els.goalSections.append(makeGoalSectionAddButton());
   resizeAllGoalTextboxesSoon();
+}
+
+function makeGoalSectionColorMenu(section) {
+  const color = getGoalPaperColor(section.color);
+  const menu = document.createElement("details");
+  menu.className = "goal-section-color-menu color-menu";
+  menu.style.setProperty("--goal-paper-accent", color.color);
+
+  const summary = document.createElement("summary");
+  summary.setAttribute("aria-label", "Change goal box color");
+  summary.title = "Change goal box color";
+  summary.style.setProperty("--menu-color", color.color);
+  summary.style.setProperty("--menu-tint", color.tint);
+  const summarySwatch = document.createElement("span");
+  summarySwatch.className = "color-menu-current";
+  summarySwatch.setAttribute("aria-hidden", "true");
+  summary.append(summarySwatch);
+
+  const items = document.createElement("div");
+  items.className = "goal-section-color-items color-menu-items";
+  const grid = document.createElement("div");
+  grid.className = "goal-section-color-grid color-menu-grid";
+
+  goalPaperColors.forEach((paperColor) => {
+    const button = makeColorOptionButton({
+      name: paperColor.name,
+      color: paperColor.color,
+      tint: paperColor.tint,
+      active: paperColor.id === normalizeGoalSectionColor(section.color),
+      ariaLabel: `Set ${paperColor.name} goal box color`,
+      onClick: () => {
+        menu.open = false;
+        updateGoalSectionColor(section.id, paperColor.id);
+      },
+    });
+    button.classList.add("goal-section-color");
+    grid.append(button);
+  });
+
+  items.append(makeColorMenuLabel(), grid);
+  menu.append(summary, items);
+  return menu;
 }
 
 function makeGoalSectionAddButton() {

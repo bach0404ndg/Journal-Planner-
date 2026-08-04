@@ -22,10 +22,12 @@
         </nav>
         <div class="section-meta-controls">
           <button class="undo-button" type="button" id="undoButton" disabled>Undo</button>
-          <label class="palette-control">
-            <span>Palette</span>
-            <select id="paletteSelect"></select>
-          </label>
+          <details class="palette-control color-menu" id="paletteMenu">
+            <summary aria-label="Choose planner color">
+              <span class="color-menu-current" aria-hidden="true"></span>
+            </summary>
+            <div class="color-menu-items" id="paletteOptions"></div>
+          </details>
         </div>
       </div>
 
