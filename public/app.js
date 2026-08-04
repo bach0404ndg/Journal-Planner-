@@ -1846,8 +1846,6 @@ function renderGoalItem(section, goal) {
     renderSelectedDateNotes();
   });
 
-  actions.append(dateInput, deleteButton);
-
   const dateBadge = document.createElement("span");
   dateBadge.className = "goal-date-badge";
   dateBadge.textContent = goal.dueDate || "";
@@ -1872,7 +1870,8 @@ function renderGoalItem(section, goal) {
     renderCalendar();
     renderSelectedDateNotes();
   };
-  goalLine.append(text, dateBadge, makeSubtaskAddButton(goal, "goal", handleSubtaskChange));
+  actions.append(makeSubtaskAddButton(goal, "goal", handleSubtaskChange), dateInput, deleteButton);
+  goalLine.append(text, dateBadge);
   textWrap.append(goalLine, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
 
   item.append(checkbox, textWrap, actions);

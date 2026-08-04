@@ -632,15 +632,15 @@ textarea:focus {
   display: grid;
   place-items: center;
   align-self: center;
-  width: 22px;
-  min-width: 22px;
-  min-height: 22px;
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   color: var(--green-meta);
   background: rgba(255, 255, 255, 0.34);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 900;
   line-height: 1;
 }
@@ -1053,12 +1053,15 @@ textarea:focus {
 }
 
 .goal-section header {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   align-items: start;
   min-height: 20px;
   margin-bottom: 10px;
+  padding-top: 2px;
+  padding-right: 42px;
 }
 
 .goal-section.is-dragging {
@@ -1086,8 +1089,8 @@ textarea:focus {
   grid-column: 1 / -1;
   place-items: center;
   width: 100%;
-  height: 12px;
-  min-height: 12px;
+  height: 10px;
+  min-height: 10px;
   cursor: pointer;
   touch-action: none;
 }
@@ -1203,8 +1206,8 @@ textarea:focus {
 
 .goal-title-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px;
   align-items: center;
   min-width: 0;
 }
@@ -1256,6 +1259,24 @@ textarea:focus {
   font-weight: 900;
 }
 
+.goal-section .goal-section-move-menu,
+.goal-section [data-action="delete-section"] {
+  position: absolute;
+  top: 10px;
+}
+
+.goal-section .goal-section-move-menu {
+  right: 20px;
+}
+
+.goal-section [data-action="delete-section"] {
+  right: 0;
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  font-size: 0.68rem;
+}
+
 .quiet-delete-button:hover,
 .goal-section [data-action="delete-section"]:hover {
   border-color: #f0b0a8;
@@ -1267,26 +1288,38 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   justify-content: end;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
+  white-space: nowrap;
 }
 
 .goal-date-input,
 .goal-delete-button {
-  width: 24px;
-  min-width: 24px;
-  min-height: 24px;
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
   border: 0;
   border-radius: 999px;
   color: rgba(22, 51, 33, 0.62);
   background: transparent;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
 }
 
 .goal-date-input {
   padding: 0;
   color-scheme: light;
+  color: transparent;
+  font-size: 0;
+  text-indent: -999px;
+}
+
+.goal-date-input::-webkit-calendar-picker-indicator {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 .goal-delete-button {
@@ -1299,19 +1332,19 @@ textarea:focus {
 .goal-section-move-menu {
   position: relative;
   align-self: start;
-  width: 24px;
-  min-width: 24px;
-  min-height: 24px;
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
 }
 
 .goal-section-move-menu summary {
   display: grid;
   place-items: center;
-  width: 24px;
-  min-height: 24px;
+  width: 20px;
+  min-height: 20px;
   border-radius: 999px;
   color: rgba(22, 51, 33, 0.62);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
