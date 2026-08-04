@@ -28,6 +28,10 @@ const paletteOptions = [
   { id: "olive", name: "Olive", color: "#6f7d35" },
   { id: "rose", name: "Rose", color: "#be3a5b" },
   { id: "brick", name: "Brick", color: "#9f4f37" },
+  { id: "teal", name: "Teal", color: "#2f7c73" },
+  { id: "mustard", name: "Mustard", color: "#b98f22" },
+  { id: "mulberry", name: "Mulberry", color: "#9a4262" },
+  { id: "slate", name: "Slate", color: "#586b62" },
 ];
 
 const calendarTaskColors = [
@@ -38,6 +42,10 @@ const calendarTaskColors = [
   { id: "olive", name: "Olive", color: "#6f7d35", tint: "rgba(111, 125, 53, 0.12)" },
   { id: "rose", name: "Rose", color: "#be3a5b", tint: "rgba(190, 58, 91, 0.11)" },
   { id: "brick", name: "Brick", color: "#9f4f37", tint: "rgba(159, 79, 55, 0.11)" },
+  { id: "teal", name: "Teal", color: "#2f7c73", tint: "rgba(47, 124, 115, 0.11)" },
+  { id: "mustard", name: "Mustard", color: "#b98f22", tint: "rgba(185, 143, 34, 0.13)" },
+  { id: "mulberry", name: "Mulberry", color: "#9a4262", tint: "rgba(154, 66, 98, 0.11)" },
+  { id: "slate", name: "Slate", color: "#586b62", tint: "rgba(88, 107, 98, 0.12)" },
 ];
 
 const emojiOptions = [
