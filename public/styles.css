@@ -1215,21 +1215,24 @@ textarea:focus {
   width: 100%;
   height: auto;
   min-height: 30px;
+  max-height: none;
   padding: 3px 6px;
   border: 1px solid transparent;
   border-radius: 6px;
   box-sizing: border-box;
   background: transparent;
   color: var(--ink);
-  field-sizing: content;
   font-family: inherit;
   font-size: inherit;
   font-weight: 700;
   line-height: 1.35;
-  overflow: visible;
+  overflow: hidden;
   overflow-wrap: anywhere;
+  overflow-x: hidden;
+  overflow-y: hidden;
   resize: none;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .goal-date-badge {

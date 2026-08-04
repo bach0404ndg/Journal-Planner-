@@ -499,6 +499,9 @@ function bindEvents() {
       if (tab.dataset.view === "journal") {
         requestAnimationFrame(resizeAllJournalTexts);
       }
+      if (tab.dataset.view === "goals") {
+        resizeAllGoalTextboxesSoon();
+      }
     });
   });
 
@@ -1506,6 +1509,7 @@ function renderGoals() {
 
   if (!sections.length) {
     els.goalSections.append(makeGoalSectionAddButton());
+    resizeAllGoalTextboxesSoon();
     return;
   }
 
@@ -1635,6 +1639,7 @@ function renderGoals() {
   });
 
   els.goalSections.append(makeGoalSectionAddButton());
+  resizeAllGoalTextboxesSoon();
 }
 
 function makeGoalSectionAddButton() {
@@ -1657,13 +1662,59 @@ function moveCaretToEnd(element) {
 }
 
 function resizeWrappingTextbox(input) {
-  input.style.height = "auto";
-  input.style.height = `${input.scrollHeight}px`;
+  const measuredHeight = measureWrappingTextboxHeight(input);
+  input.style.height = `${measuredHeight}px`;
+}
+
+function measureWrappingTextboxHeight(input) {
+  const fallbackHeight = () => {
+    input.style.height = "0px";
+    return input.scrollHeight + 2;
+  };
+
+  if (input.tagName !== "TEXTAREA" || !input.ownerDocument?.body || !input.clientWidth) {
+    return fallbackHeight();
+  }
+
+  const styles = window.getComputedStyle(input);
+  const mirror = input.ownerDocument.createElement("div");
+  mirror.textContent = input.value || " ";
+  mirror.style.position = "absolute";
+  mirror.style.visibility = "hidden";
+  mirror.style.pointerEvents = "none";
+  mirror.style.zIndex = "-1";
+  mirror.style.top = "0";
+  mirror.style.left = "-9999px";
+  mirror.style.width = `${input.clientWidth}px`;
+  mirror.style.minHeight = "0";
+  mirror.style.maxHeight = "none";
+  mirror.style.height = "auto";
+  mirror.style.padding = styles.padding;
+  mirror.style.border = styles.border;
+  mirror.style.boxSizing = styles.boxSizing;
+  mirror.style.font = styles.font;
+  mirror.style.lineHeight = styles.lineHeight;
+  mirror.style.letterSpacing = styles.letterSpacing;
+  mirror.style.whiteSpace = "pre-wrap";
+  mirror.style.overflowWrap = "anywhere";
+  mirror.style.wordBreak = "break-word";
+  input.ownerDocument.body.append(mirror);
+
+  const minHeight = Number.parseFloat(styles.minHeight) || 0;
+  const height = Math.max(minHeight, Math.ceil(mirror.scrollHeight) + 2);
+  mirror.remove();
+  return height;
 }
 
 function resizeWrappingTextboxSoon(input) {
   resizeWrappingTextbox(input);
   window.requestAnimationFrame(() => resizeWrappingTextbox(input));
+}
+
+function resizeAllGoalTextboxesSoon() {
+  window.requestAnimationFrame(() => {
+    document.querySelectorAll(".goal-text-input, .section-title-input").forEach(resizeWrappingTextboxSoon);
+  });
 }
 
 function enableDoubleClickInputEdit(input, { trigger = input, onUnlock } = {}) {
