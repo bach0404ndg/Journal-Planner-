@@ -28,10 +28,12 @@ const paletteOptions = [
   { id: "olive", name: "Olive", color: "#6f7d35" },
   { id: "rose", name: "Rose", color: "#be3a5b" },
   { id: "brick", name: "Brick", color: "#9f4f37" },
-  { id: "teal", name: "Teal", color: "#2f7c73" },
-  { id: "mustard", name: "Mustard", color: "#b98f22" },
-  { id: "mulberry", name: "Mulberry", color: "#9a4262" },
-  { id: "slate", name: "Slate", color: "#586b62" },
+  { id: "mint", name: "Mint", color: "#1fa66a" },
+  { id: "tangerine", name: "Tangerine", color: "#f07822" },
+  { id: "berry", name: "Berry", color: "#e23d70" },
+  { id: "lavender", name: "Lavender", color: "#7b61d1" },
+  { id: "cocoa", name: "Cocoa", color: "#8a5a2b" },
+  { id: "ocean", name: "Ocean", color: "#1688a8" },
 ];
 
 const calendarTaskColors = [
@@ -42,10 +44,12 @@ const calendarTaskColors = [
   { id: "olive", name: "Olive", color: "#6f7d35", tint: "rgba(111, 125, 53, 0.12)" },
   { id: "rose", name: "Rose", color: "#be3a5b", tint: "rgba(190, 58, 91, 0.11)" },
   { id: "brick", name: "Brick", color: "#9f4f37", tint: "rgba(159, 79, 55, 0.11)" },
-  { id: "teal", name: "Teal", color: "#2f7c73", tint: "rgba(47, 124, 115, 0.11)" },
-  { id: "mustard", name: "Mustard", color: "#b98f22", tint: "rgba(185, 143, 34, 0.13)" },
-  { id: "mulberry", name: "Mulberry", color: "#9a4262", tint: "rgba(154, 66, 98, 0.11)" },
-  { id: "slate", name: "Slate", color: "#586b62", tint: "rgba(88, 107, 98, 0.12)" },
+  { id: "mint", name: "Mint", color: "#1fa66a", tint: "rgba(31, 166, 106, 0.13)" },
+  { id: "tangerine", name: "Tangerine", color: "#f07822", tint: "rgba(240, 120, 34, 0.14)" },
+  { id: "berry", name: "Berry", color: "#e23d70", tint: "rgba(226, 61, 112, 0.12)" },
+  { id: "lavender", name: "Lavender", color: "#7b61d1", tint: "rgba(123, 97, 209, 0.12)" },
+  { id: "cocoa", name: "Cocoa", color: "#8a5a2b", tint: "rgba(138, 90, 43, 0.12)" },
+  { id: "ocean", name: "Ocean", color: "#1688a8", tint: "rgba(22, 136, 168, 0.12)" },
 ];
 
 const emojiOptions = [
@@ -1692,8 +1696,10 @@ function makeTaskDuplicateButton(dateKey, noteId, customDuplicate) {
 }
 
 function makeTaskRow(note, dateKey, variant) {
+  const isSpecialCalendarTask = variant === "calendar" && Boolean(note.specialTaskId);
   const task = document.createElement("div");
   task.className = variant === "calendar" ? "note-pill calendar-task" : "mini-item calendar-task";
+  task.classList.toggle("is-special-calendar-task", isSpecialCalendarTask);
   task.classList.toggle("is-done", Boolean(note.done));
   const color = getCalendarTaskColor(note.color);
   task.style.setProperty("--task-color", color.color);
@@ -1721,16 +1727,21 @@ function makeTaskRow(note, dateKey, variant) {
   input.className = "task-text-input";
   input.type = "text";
   input.value = note.text;
-  input.setAttribute("aria-label", "Edit task");
-  input.addEventListener("change", () => {
-    updateCalendarTaskText(dateKey, note.id, input.value);
-  });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      input.blur();
-    }
-  });
+  input.readOnly = isSpecialCalendarTask;
+  input.setAttribute("aria-label", isSpecialCalendarTask ? "Special task name" : "Edit task");
+  if (isSpecialCalendarTask) {
+    input.title = "Edit this name from the saved special task at the top";
+  } else {
+    input.addEventListener("change", () => {
+      updateCalendarTaskText(dateKey, note.id, input.value);
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      }
+    });
+  }
 
   const deleteButton = document.createElement("button");
   deleteButton.className = "task-delete-button";

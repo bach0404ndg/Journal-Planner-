@@ -67,44 +67,64 @@
   --green-soft-light: #fbf0eb;
 }
 
-:root[data-palette="teal"] {
-  --green: #2f7c73;
-  --green-rgb: 47, 124, 115;
-  --green-active: #245f58;
-  --green-dark: #173f3a;
-  --green-meta: #2c7169;
-  --green-soft: #d3ebe7;
-  --green-soft-light: #edf9f6;
+:root[data-palette="mint"] {
+  --green: #1fa66a;
+  --green-rgb: 31, 166, 106;
+  --green-active: #147d4e;
+  --green-dark: #0d5234;
+  --green-meta: #188c58;
+  --green-soft: #c8f0dd;
+  --green-soft-light: #edfff6;
 }
 
-:root[data-palette="mustard"] {
-  --green: #b98f22;
-  --green-rgb: 185, 143, 34;
-  --green-active: #8d6c17;
-  --green-dark: #5d4710;
-  --green-meta: #9c761c;
-  --green-soft: #f3e3b4;
-  --green-soft-light: #fbf4dd;
+:root[data-palette="tangerine"] {
+  --green: #f07822;
+  --green-rgb: 240, 120, 34;
+  --green-active: #c35a10;
+  --green-dark: #803a0a;
+  --green-meta: #d76618;
+  --green-soft: #ffd9b8;
+  --green-soft-light: #fff2e5;
 }
 
-:root[data-palette="mulberry"] {
-  --green: #9a4262;
-  --green-rgb: 154, 66, 98;
-  --green-active: #78324c;
-  --green-dark: #512133;
-  --green-meta: #8c3b59;
-  --green-soft: #ecd2dc;
-  --green-soft-light: #faeef3;
+:root[data-palette="berry"] {
+  --green: #e23d70;
+  --green-rgb: 226, 61, 112;
+  --green-active: #bd2856;
+  --green-dark: #7a1735;
+  --green-meta: #cc315f;
+  --green-soft: #f8c9d9;
+  --green-soft-light: #fff0f6;
 }
 
-:root[data-palette="slate"] {
-  --green: #586b62;
-  --green-rgb: 88, 107, 98;
-  --green-active: #45554d;
-  --green-dark: #2d3833;
-  --green-meta: #506158;
-  --green-soft: #dbe3df;
-  --green-soft-light: #f0f5f2;
+:root[data-palette="lavender"] {
+  --green: #7b61d1;
+  --green-rgb: 123, 97, 209;
+  --green-active: #6048ad;
+  --green-dark: #3d2b78;
+  --green-meta: #6d55bf;
+  --green-soft: #ddd5ff;
+  --green-soft-light: #f3efff;
+}
+
+:root[data-palette="cocoa"] {
+  --green: #8a5a2b;
+  --green-rgb: 138, 90, 43;
+  --green-active: #70451e;
+  --green-dark: #4b2d13;
+  --green-meta: #7a4d24;
+  --green-soft: #ead6bd;
+  --green-soft-light: #f8efe3;
+}
+
+:root[data-palette="ocean"] {
+  --green: #1688a8;
+  --green-rgb: 22, 136, 168;
+  --green-active: #0f6b85;
+  --green-dark: #0a4859;
+  --green-meta: #137a98;
+  --green-soft: #c7edf5;
+  --green-soft-light: #ecfbff;
 }
 
 * {
@@ -850,6 +870,47 @@ textarea:focus {
   align-items: center;
   border-left-color: var(--task-color, var(--coral));
   background: var(--task-tint, rgba(255, 255, 255, 0.56));
+}
+
+.calendar-task.is-special-calendar-task {
+  position: relative;
+  overflow: hidden;
+  padding-left: 11px;
+  border: 1px solid rgba(22, 51, 33, 0.1);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.38)),
+    var(--task-tint, rgba(255, 255, 255, 0.56));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+}
+
+.calendar-task.is-special-calendar-task::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 9px;
+  border-radius: 999px 0 0 999px;
+  background: var(--task-color, rgba(22, 51, 33, 0.24));
+}
+
+.calendar-task.is-special-calendar-task .task-drag-handle::before {
+  width: 28px;
+  background: var(--task-color, rgba(22, 51, 33, 0.24));
+  opacity: 0.34;
+}
+
+.calendar-task.is-special-calendar-task .task-text-input {
+  border-radius: 999px;
+}
+
+.calendar-task.is-special-calendar-task .task-text-input[readonly] {
+  cursor: default;
+}
+
+.calendar-task.is-special-calendar-task .task-text-input[readonly]:focus {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .calendar-task-actions {
