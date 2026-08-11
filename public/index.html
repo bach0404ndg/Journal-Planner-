@@ -37,7 +37,11 @@
             <div class="calendar-date-controls" aria-label="Calendar date controls">
               <label>
                 <span>Date</span>
-                <input id="selectedDateInput" type="date">
+                <div class="picker-input-row">
+                  <input id="selectedDateInput" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
+                  <button class="picker-open-button" id="selectedDatePickerButton" type="button" aria-label="Open calendar date picker">▦</button>
+                  <input class="native-picker-input" id="selectedDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                </div>
               </label>
               <label>
                 <span>Month</span>
@@ -102,11 +106,15 @@
               </label>
               <label>
                 <span>Date</span>
-                <input id="journalDate" type="date">
+                <div class="picker-input-row">
+                  <input id="journalDate" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
+                  <button class="picker-open-button" id="journalDatePickerButton" type="button" aria-label="Open date picker">▦</button>
+                  <input class="native-picker-input" id="journalDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                </div>
               </label>
               <label>
                 <span>Time</span>
-                <input id="journalTime" type="time">
+                <input id="journalTime" type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm">
               </label>
             </div>
             <div class="journal-label-row">
@@ -139,7 +147,11 @@
               <div class="journal-filter-controls">
                 <label>
                   <span>Date</span>
-                  <input id="journalFilterDate" type="date">
+                  <div class="picker-input-row">
+                    <input id="journalFilterDate" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
+                    <button class="picker-open-button" id="journalFilterDatePickerButton" type="button" aria-label="Open saved journal date picker">▦</button>
+                    <input class="native-picker-input" id="journalFilterDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                  </div>
                 </label>
                 <label>
                   <span>Month</span>

@@ -116,6 +116,8 @@ const els = {
   calendarGrid: document.querySelector("#calendarGrid"),
   specialTaskTracker: document.querySelector("#specialTaskTracker"),
   selectedDateInput: document.querySelector("#selectedDateInput"),
+  selectedDatePicker: document.querySelector("#selectedDatePicker"),
+  selectedDatePickerButton: document.querySelector("#selectedDatePickerButton"),
   calendarRemoveOldDataButton: document.querySelector("#calendarRemoveOldDataButton"),
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
@@ -138,6 +140,8 @@ const els = {
   journalForm: document.querySelector("#journalForm"),
   journalCity: document.querySelector("#journalCity"),
   journalDate: document.querySelector("#journalDate"),
+  journalDatePicker: document.querySelector("#journalDatePicker"),
+  journalDatePickerButton: document.querySelector("#journalDatePickerButton"),
   journalTime: document.querySelector("#journalTime"),
   journalLabel: document.querySelector("#journalLabel"),
   addJournalLabelButton: document.querySelector("#addJournalLabelButton"),
@@ -150,6 +154,8 @@ const els = {
   journalResizeHandle: document.querySelector("#journalResizeHandle"),
   journalLog: document.querySelector("#journalLog"),
   journalFilterDate: document.querySelector("#journalFilterDate"),
+  journalFilterDatePicker: document.querySelector("#journalFilterDatePicker"),
+  journalFilterDatePickerButton: document.querySelector("#journalFilterDatePickerButton"),
   journalFilterMonth: document.querySelector("#journalFilterMonth"),
   journalFilterYear: document.querySelector("#journalFilterYear"),
   journalFilterLabel: document.querySelector("#journalFilterLabel"),
@@ -357,6 +363,7 @@ function normalizeTask(task) {
     text: task.text || "",
     done: Boolean(task.done),
     color: normalizeCalendarTaskColor(task.color),
+    time: normalizeTimeValue(task.time),
     specialTaskId: task.specialTaskId || "",
     subtasks: normalizeSubtasks(task.subtasks),
   };
@@ -412,6 +419,106 @@ function journalTimeLabel(timeValue) {
   const period = hourValue >= 12 ? "PM" : "AM";
   const hour = hourValue % 12 || 12;
   return `${hour}:${String(minuteValue).padStart(2, "0")} ${period}`;
+}
+
+function normalizeTimeValue(timeValue) {
+  if (typeof timeValue !== "string") return "";
+  const trimmed = timeValue.trim();
+  const match = trimmed.match(/^(\d{1,2}):?(\d{2})$/);
+  if (!match) return "";
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour > 23 || minute > 59) return "";
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function normalizeDateInput(dateValue) {
+  if (typeof dateValue !== "string") return "";
+  const trimmed = dateValue.trim();
+  const match = trimmed.match(/^(\d{4})[-/.]?(\d{1,2})[-/.]?(\d{1,2})$/);
+  if (!match) return "";
+  return dateKeyFromParts(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+function sanitizeDateDraft(dateValue) {
+  return String(dateValue || "")
+    .replace(/[^\d\-/.]/g, "")
+    .slice(0, 10);
+}
+
+function sanitizeTimeDraft(timeValue) {
+  const clean = String(timeValue || "").replace(/[^\d:]/g, "");
+  if (clean.includes(":")) {
+    const [hour = "", minute = ""] = clean.split(":");
+    return `${hour.replace(/\D/g, "").slice(0, 2)}:${minute.replace(/\D/g, "").slice(0, 2)}`.slice(0, 5);
+  }
+  const digits = clean.replace(/\D/g, "").slice(0, 4);
+  if (digits.length > 2) {
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  }
+  return digits;
+}
+
+function openNativePicker(input) {
+  if (typeof input.showPicker === "function") {
+    input.showPicker();
+    return;
+  }
+  input.click();
+}
+
+function currentDateKey() {
+  return toDateKey(new Date());
+}
+
+function currentTimeValue() {
+  return normalizeTimeValue(new Date().toTimeString().slice(0, 5));
+}
+
+function compareTimeValues(a = "", b = "") {
+  const left = normalizeTimeValue(a);
+  const right = normalizeTimeValue(b);
+  if (left && right) return left.localeCompare(right);
+  if (left) return -1;
+  if (right) return 1;
+  return 0;
+}
+
+function compareEntryDateTime(a, b) {
+  const dateCompare = (a.date || "").localeCompare(b.date || "");
+  if (dateCompare) return dateCompare;
+  const timeCompare = compareTimeValues(a.time, b.time);
+  if (timeCompare) return timeCompare;
+  return (a.createdAt || "").localeCompare(b.createdAt || "");
+}
+
+function sortedJournalEntries(entries) {
+  return [...entries].sort(compareEntryDateTime);
+}
+
+function sortedCalendarTasks(notes) {
+  return [...notes].sort((a, b) => {
+    const timeCompare = compareTimeValues(a.time, b.time);
+    if (timeCompare) return timeCompare;
+    return 0;
+  });
+}
+
+function datePartsFromKey(dateKey) {
+  const [year, month, day] = (dateKey || "").split("-").map(Number);
+  return {
+    year: Number.isFinite(year) && year > 0 ? year : new Date().getFullYear(),
+    month: Number.isFinite(month) && month >= 1 && month <= 12 ? month : new Date().getMonth() + 1,
+    day: Number.isFinite(day) && day >= 1 ? day : new Date().getDate(),
+  };
+}
+
+function dateKeyFromParts(year, month, day) {
+  const safeYear = Math.min(Math.max(Number(year) || new Date().getFullYear(), 1970), 2099);
+  const safeMonth = Math.min(Math.max(Number(month) || 1, 1), 12);
+  const daysInMonth = new Date(safeYear, safeMonth, 0).getDate();
+  const safeDay = Math.min(Math.max(Number(day) || 1, 1), daysInMonth);
+  return `${safeYear}-${String(safeMonth).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
 }
 
 function parseDateKey(dateKey) {
@@ -500,10 +607,12 @@ function init() {
   els.monthSelect.value = state.month;
   els.yearInput.value = state.year;
   els.selectedDateInput.value = state.selectedDate;
+  els.selectedDatePicker.value = state.selectedDate;
 
   const now = new Date();
   els.journalDate.value = toDateKey(now);
-  els.journalTime.value = now.toTimeString().slice(0, 5);
+  els.journalTime.value = currentTimeValue();
+  els.journalDatePicker.value = els.journalDate.value;
   renderPaletteOptions();
   renderSpecialTasks();
   applyJournalLayout();
@@ -512,6 +621,7 @@ function init() {
   ensureStarterSections();
   renderJournalLabelOptions();
   renderAll();
+  requestAnimationFrame(resizeJournalFormText);
   updateUndoButton();
 }
 
@@ -522,14 +632,37 @@ function bindEvents() {
     renderCalendar();
   });
 
+  els.selectedDateInput.addEventListener("input", () => {
+    els.selectedDateInput.value = sanitizeDateDraft(els.selectedDateInput.value);
+  });
+  els.selectedDateInput.addEventListener("focus", () => {
+    if (!els.selectedDateInput.value) {
+      els.selectedDateInput.value = state.selectedDate || currentDateKey();
+    }
+  });
   els.selectedDateInput.addEventListener("change", () => {
-    if (!els.selectedDateInput.value) return;
-    const nextDate = parseDateKey(els.selectedDateInput.value);
-    state.selectedDate = els.selectedDateInput.value;
-    state.month = nextDate.getMonth();
-    state.year = nextDate.getFullYear();
-    els.monthSelect.value = state.month;
-    els.yearInput.value = state.year;
+    applyCalendarDateInput();
+  });
+  els.selectedDateInput.addEventListener("blur", () => {
+    applyCalendarDateInput();
+  });
+  els.selectedDateInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      applyCalendarDateInput();
+      els.selectedDateInput.blur();
+    }
+  });
+  els.selectedDatePickerButton.addEventListener("click", () => {
+    const nextDateKey = normalizeDateInput(els.selectedDateInput.value) || state.selectedDate || currentDateKey();
+    els.selectedDateInput.value = nextDateKey;
+    els.selectedDatePicker.value = nextDateKey;
+    openNativePicker(els.selectedDatePicker);
+  });
+  els.selectedDatePicker.addEventListener("change", () => {
+    const nextDateKey = normalizeDateInput(els.selectedDatePicker.value);
+    if (!nextDateKey) return;
+    setCalendarDate(nextDateKey);
     renderCalendar();
   });
 
@@ -578,6 +711,52 @@ function bindEvents() {
 
   els.journalResizeHandle.addEventListener("pointerdown", startJournalResize);
 
+  els.journalDate.addEventListener("input", () => {
+    els.journalDate.value = sanitizeDateDraft(els.journalDate.value);
+  });
+  els.journalDate.addEventListener("focus", () => {
+    if (!els.journalDate.value) {
+      els.journalDate.value = currentDateKey();
+      els.journalDatePicker.value = els.journalDate.value;
+    }
+  });
+  els.journalDate.addEventListener("blur", () => {
+    els.journalDate.value = normalizeDateInput(els.journalDate.value) || currentDateKey();
+    els.journalDatePicker.value = els.journalDate.value;
+  });
+  els.journalDate.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      els.journalDate.blur();
+    }
+  });
+  els.journalDatePickerButton.addEventListener("click", () => {
+    const nextDateKey = normalizeDateInput(els.journalDate.value) || currentDateKey();
+    els.journalDate.value = nextDateKey;
+    els.journalDatePicker.value = nextDateKey;
+    openNativePicker(els.journalDatePicker);
+  });
+  els.journalDatePicker.addEventListener("change", () => {
+    els.journalDate.value = normalizeDateInput(els.journalDatePicker.value) || els.journalDate.value;
+  });
+
+  els.journalTime.addEventListener("input", () => {
+    els.journalTime.value = sanitizeTimeDraft(els.journalTime.value);
+  });
+  els.journalTime.addEventListener("focus", () => {
+    if (!els.journalTime.value) {
+      els.journalTime.value = currentTimeValue();
+    }
+  });
+  els.journalTime.addEventListener("blur", () => {
+    els.journalTime.value = normalizeTimeValue(els.journalTime.value) || currentTimeValue();
+  });
+  els.journalTime.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      els.journalTime.blur();
+    }
+  });
   els.tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       els.tabs.forEach((item) => item.classList.toggle("is-active", item === tab));
@@ -605,6 +784,7 @@ function bindEvents() {
       text,
       done: false,
       color: "",
+      time: "",
       subtasks: [],
     });
     state.data.calendarNotes[state.selectedDate] = notes;
@@ -625,8 +805,8 @@ function bindEvents() {
 
     const entryData = {
       city: els.journalCity.value.trim(),
-      date: els.journalDate.value,
-      time: els.journalTime.value,
+      date: normalizeDateInput(els.journalDate.value) || currentDateKey(),
+      time: normalizeTimeValue(els.journalTime.value),
       label: els.journalLabel.value,
       text: entryText,
     };
@@ -638,7 +818,7 @@ function bindEvents() {
         Object.assign(entry, entryData, { tags: entryData.label ? [entryData.label] : [], updatedAt: new Date().toISOString() });
       }
     } else {
-      state.data.journalEntries.unshift({
+      state.data.journalEntries.push({
         id: makeId("journal"),
         ...entryData,
         tags: entryData.label ? [entryData.label] : [],
@@ -649,6 +829,10 @@ function bindEvents() {
     resetJournalForm();
     saveData();
     renderJournal();
+  });
+
+  els.journalText.addEventListener("input", () => {
+    resizeJournalFormText();
   });
 
   els.addJournalLabelButton.addEventListener("click", () => {
@@ -694,8 +878,37 @@ function bindEvents() {
     resetJournalForm();
   });
 
+  els.journalFilterDate.addEventListener("input", () => {
+    els.journalFilterDate.value = sanitizeDateDraft(els.journalFilterDate.value);
+  });
+  els.journalFilterDate.addEventListener("focus", () => {
+    if (!els.journalFilterDate.value) {
+      els.journalFilterDate.value = currentDateKey();
+    }
+  });
   els.journalFilterDate.addEventListener("change", () => {
-    state.journalFilters.date = els.journalFilterDate.value;
+    applyJournalFilterDateInput();
+  });
+  els.journalFilterDate.addEventListener("blur", () => {
+    applyJournalFilterDateInput();
+  });
+  els.journalFilterDate.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      applyJournalFilterDateInput();
+      els.journalFilterDate.blur();
+    }
+  });
+  els.journalFilterDatePickerButton.addEventListener("click", () => {
+    const nextDateKey = normalizeDateInput(els.journalFilterDate.value) || currentDateKey();
+    els.journalFilterDate.value = nextDateKey;
+    els.journalFilterDatePicker.value = nextDateKey;
+    openNativePicker(els.journalFilterDatePicker);
+  });
+  els.journalFilterDatePicker.addEventListener("change", () => {
+    const nextDateKey = normalizeDateInput(els.journalFilterDatePicker.value);
+    state.journalFilters.date = nextDateKey;
+    els.journalFilterDate.value = nextDateKey;
     renderJournal();
   });
 
@@ -717,6 +930,7 @@ function bindEvents() {
   els.resetJournalFiltersButton.addEventListener("click", () => {
     state.journalFilters = { date: "", month: "", year: "", label: "" };
     els.journalFilterDate.value = "";
+    els.journalFilterDatePicker.value = "";
     els.journalFilterMonth.value = "";
     els.journalFilterYear.value = "";
     els.journalFilterLabel.value = "";
@@ -962,6 +1176,7 @@ function addSpecialTaskToSelectedDate(task) {
     text: task.text,
     done: false,
     color: normalizeCalendarTaskColor(task.color),
+    time: "",
     specialTaskId: task.id,
     subtasks: [],
   });
@@ -1135,8 +1350,28 @@ function setCalendarDate(dateKey) {
   state.month = nextDate.getMonth();
   state.year = nextDate.getFullYear();
   els.selectedDateInput.value = state.selectedDate;
+  els.selectedDatePicker.value = state.selectedDate;
   els.monthSelect.value = state.month;
   els.yearInput.value = state.year;
+}
+
+function applyCalendarDateInput() {
+  const nextDateKey = normalizeDateInput(els.selectedDateInput.value);
+  if (!nextDateKey) {
+    els.selectedDateInput.value = state.selectedDate;
+    els.selectedDatePicker.value = state.selectedDate;
+    return;
+  }
+  setCalendarDate(nextDateKey);
+  renderCalendar();
+}
+
+function applyJournalFilterDateInput() {
+  const nextDateKey = normalizeDateInput(els.journalFilterDate.value);
+  state.journalFilters.date = nextDateKey;
+  els.journalFilterDate.value = nextDateKey;
+  els.journalFilterDatePicker.value = nextDateKey;
+  renderJournal();
 }
 
 function ensureStarterSections() {
@@ -1433,7 +1668,7 @@ function renderCalendar() {
 
     const notes = document.createElement("span");
     notes.className = "cell-notes";
-    const dayNotes = state.data.calendarNotes[dateKey] || [];
+    const dayNotes = sortedCalendarTasks(state.data.calendarNotes[dateKey] || []);
     dayNotes.forEach((note) => notes.append(makeCalendarTask(note, dateKey)));
     getGoalsForDate(dateKey).forEach((goalMatch) => notes.append(makeCalendarGoalTask(goalMatch, "calendar")));
 
@@ -1717,6 +1952,7 @@ function duplicateGoalTaskToCalendar(goal) {
     text: goal.text,
     done: false,
     color: "",
+    time: "",
     subtasks: [],
   });
   state.data.calendarNotes[goal.dueDate] = notes;
@@ -1758,6 +1994,21 @@ function updateCalendarTaskText(dateKey, noteId, text) {
   }
 }
 
+function updateCalendarTaskTime(dateKey, noteId, timeValue) {
+  const note = (state.data.calendarNotes[dateKey] || []).find((item) => item.id === noteId);
+  if (!note) return;
+  const nextTime = normalizeTimeValue(timeValue);
+  if ((note.time || "") === nextTime) return;
+
+  queueUndo("calendar task time");
+  note.time = nextTime;
+  saveData();
+  renderCalendar();
+  if (dateKey === state.selectedDate) {
+    renderSelectedDateNotes();
+  }
+}
+
 function duplicateCalendarTask(dateKey, noteId) {
   const note = (state.data.calendarNotes[dateKey] || []).find((item) => item.id === noteId);
   if (!note) return;
@@ -1790,6 +2041,71 @@ function makeTaskDuplicateButton(dateKey, noteId, customDuplicate) {
     duplicateCalendarTask(dateKey, noteId);
   });
   return button;
+}
+
+function makeTaskTimeMenu(dateKey, note) {
+  const menu = document.createElement("details");
+  menu.className = "task-time-menu";
+  menu.addEventListener("click", (event) => event.stopPropagation());
+
+  const summary = document.createElement("summary");
+  summary.className = "task-time-button";
+  summary.textContent = "◷";
+  summary.title = note.time ? `Time: ${normalizeTimeValue(note.time)}` : "Set time";
+  summary.setAttribute("aria-label", "Set task time");
+
+  const popover = document.createElement("div");
+  popover.className = "task-time-popover";
+
+  const input = document.createElement("input");
+  input.className = "task-time-input";
+  input.type = "text";
+  input.inputMode = "numeric";
+  input.maxLength = 5;
+  input.placeholder = "hh:mm";
+  input.value = normalizeTimeValue(note.time);
+  input.title = note.time ? `Time: ${normalizeTimeValue(note.time)}` : "Set time";
+  input.setAttribute("aria-label", "Set task time");
+  input.addEventListener("click", (event) => event.stopPropagation());
+  input.addEventListener("focus", () => {
+    if (!input.value) {
+      input.value = currentTimeValue();
+    }
+  });
+  input.addEventListener("input", () => {
+    input.value = sanitizeTimeDraft(input.value);
+  });
+  input.addEventListener("change", () => {
+    updateCalendarTaskTime(dateKey, note.id, input.value);
+    menu.open = false;
+  });
+  input.addEventListener("blur", () => {
+    input.value = normalizeTimeValue(input.value);
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      updateCalendarTaskTime(dateKey, note.id, input.value);
+      input.blur();
+    }
+    if (event.key === "Escape") {
+      input.value = normalizeTimeValue(note.time);
+      menu.open = false;
+    }
+  });
+  menu.addEventListener("toggle", () => {
+    if (!menu.open) return;
+    if (!input.value) {
+      input.value = currentTimeValue();
+    }
+    window.requestAnimationFrame(() => {
+      input.focus();
+    });
+  });
+
+  popover.append(input);
+  menu.append(summary, popover);
+  return menu;
 }
 
 function makeTaskRow(note, dateKey, variant) {
@@ -1840,6 +2156,14 @@ function makeTaskRow(note, dateKey, variant) {
     });
   }
 
+  const textWrap = document.createElement("div");
+  textWrap.className = "task-text-wrap";
+  const timeBadge = document.createElement("span");
+  timeBadge.className = "task-time-badge";
+  timeBadge.textContent = normalizeTimeValue(note.time);
+  timeBadge.hidden = !normalizeTimeValue(note.time);
+  textWrap.append(input, timeBadge);
+
   const deleteButton = document.createElement("button");
   deleteButton.className = "task-delete-button";
   deleteButton.type = "button";
@@ -1858,12 +2182,12 @@ function makeTaskRow(note, dateKey, variant) {
   const actions = document.createElement("div");
   actions.className = "calendar-task-actions";
   if (variant === "calendar") {
-    actions.append(makeTaskDuplicateButton(dateKey, note.id), deleteButton);
+    actions.append(makeTaskTimeMenu(dateKey, note), makeTaskDuplicateButton(dateKey, note.id), deleteButton);
   } else {
-    actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
+    actions.append(makeTaskTimeMenu(dateKey, note), makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
   }
 
-  task.append(checkbox, input, actions);
+  task.append(checkbox, textWrap, actions);
   task.append(makeSubtaskPanel(note, "calendar task", handleSubtaskChange));
   return task;
 }
@@ -1992,9 +2316,10 @@ function makeSubtaskRow(parent, subtask, ownerLabel, afterChange) {
 
 function renderSelectedDateNotes() {
   els.selectedDateInput.value = state.selectedDate;
+  els.selectedDatePicker.value = state.selectedDate;
   renderEmojiPalette();
   els.selectedDateNotes.innerHTML = "";
-  const notes = state.data.calendarNotes[state.selectedDate] || [];
+  const notes = sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []);
 
   notes.forEach((note) => {
     els.selectedDateNotes.append(makeTaskRow(note, state.selectedDate, "selected"));
@@ -2031,24 +2356,28 @@ function makeOption(value, label) {
 function resetJournalForm() {
   state.editingJournalId = null;
   els.journalCity.value = "";
-  els.journalDate.value = toDateKey(new Date());
-  els.journalTime.value = new Date().toTimeString().slice(0, 5);
+  els.journalDate.value = currentDateKey();
+  els.journalTime.value = currentTimeValue();
+  els.journalDatePicker.value = els.journalDate.value;
   els.journalLabel.value = "";
   els.journalText.value = "";
   els.journalSubmitButton.textContent = "Save entry";
   els.cancelJournalEditButton.hidden = true;
+  resizeJournalFormText();
 }
 
 function startJournalEdit(entry) {
   state.data.journalEntryCollapsed = false;
   state.editingJournalId = entry.id;
   els.journalCity.value = entry.city || "";
-  els.journalDate.value = entry.date || toDateKey(new Date());
-  els.journalTime.value = entry.time || new Date().toTimeString().slice(0, 5);
+  els.journalDate.value = entry.date || currentDateKey();
+  els.journalTime.value = normalizeTimeValue(entry.time) || currentTimeValue();
+  els.journalDatePicker.value = els.journalDate.value;
   els.journalLabel.value = getEntryLabel(entry);
   els.journalText.value = entry.text || "";
   els.journalSubmitButton.textContent = "Update entry";
   els.cancelJournalEditButton.hidden = false;
+  resizeJournalFormText();
   saveData();
   applyJournalLayout();
   window.scrollTo({ top: els.journalForm.offsetTop - 24, behavior: "smooth" });
@@ -2066,7 +2395,7 @@ function deleteJournalEntry(entryId) {
 }
 
 function filteredJournalEntries() {
-  return state.data.journalEntries.filter((entry) => {
+  return sortedJournalEntries(state.data.journalEntries.filter((entry) => {
     const dateMatches = !state.journalFilters.date || entry.date === state.journalFilters.date;
     const entryDate = entry.date ? parseDateKey(entry.date) : null;
     const monthMatches =
@@ -2074,7 +2403,7 @@ function filteredJournalEntries() {
     const yearMatches = !state.journalFilters.year || (entryDate && String(entryDate.getFullYear()) === state.journalFilters.year);
     const labelMatches = !state.journalFilters.label || getEntryLabel(entry) === state.journalFilters.label;
     return dateMatches && monthMatches && yearMatches && labelMatches;
-  });
+  }));
 }
 
 function renderGoals() {
@@ -2150,14 +2479,32 @@ function renderGoals() {
       els.goalSections.querySelectorAll(".is-drop-target").forEach((item) => item.classList.remove("is-drop-target"));
     });
     card.addEventListener("dragover", (event) => {
+      if (state.draggingGoalItem) {
+        event.preventDefault();
+        card.classList.add("is-goal-item-drop-target");
+        goalList.classList.add("is-goal-list-drop-target");
+        return;
+      }
       if (!state.draggingGoalSectionId || state.draggingGoalSectionId === section.id) return;
       event.preventDefault();
       card.classList.add("is-drop-target");
     });
-    card.addEventListener("dragleave", () => {
+    card.addEventListener("dragleave", (event) => {
+      if (event.currentTarget.contains(event.relatedTarget)) return;
       card.classList.remove("is-drop-target");
+      card.classList.remove("is-goal-item-drop-target");
+      goalList.classList.remove("is-goal-list-drop-target");
     });
     card.addEventListener("drop", (event) => {
+      if (state.draggingGoalItem) {
+        event.preventDefault();
+        event.stopPropagation();
+        card.classList.remove("is-goal-item-drop-target");
+        goalList.classList.remove("is-goal-list-drop-target");
+        moveGoalToSection(state.draggingGoalItem.sectionId, state.draggingGoalItem.goalId, section.id);
+        clearGoalItemDrag();
+        return;
+      }
       event.preventDefault();
       card.classList.remove("is-drop-target");
       moveGoalSection(event.dataTransfer.getData("text/plain") || state.draggingGoalSectionId, section.id);
@@ -2208,6 +2555,28 @@ function renderGoals() {
       saveData();
       renderGoals();
       renderCalendar();
+    });
+
+    goalList.addEventListener("dragover", (event) => {
+      const dragging = state.draggingGoalItem;
+      if (!dragging) return;
+      event.preventDefault();
+      card.classList.add("is-goal-item-drop-target");
+      goalList.classList.add("is-goal-list-drop-target");
+    });
+    goalList.addEventListener("dragleave", (event) => {
+      if (event.currentTarget.contains(event.relatedTarget)) return;
+      goalList.classList.remove("is-goal-list-drop-target");
+    });
+    goalList.addEventListener("drop", (event) => {
+      const dragging = state.draggingGoalItem;
+      if (!dragging) return;
+      event.preventDefault();
+      event.stopPropagation();
+      card.classList.remove("is-goal-item-drop-target");
+      goalList.classList.remove("is-goal-list-drop-target");
+      moveGoalToSection(dragging.sectionId, dragging.goalId, section.id);
+      clearGoalItemDrag();
     });
 
     if (section.goals.length) {
@@ -2533,6 +2902,40 @@ function renderGoalItem(section, goal) {
   const item = document.createElement("li");
   item.className = "goal-item";
   item.classList.toggle("is-done", goal.done);
+  item.dataset.goalId = goal.id;
+
+  const dragHandle = document.createElement("span");
+  dragHandle.className = "goal-item-drag-handle";
+  dragHandle.draggable = true;
+  dragHandle.role = "button";
+  dragHandle.tabIndex = 0;
+  dragHandle.title = "Drag to move goal";
+  dragHandle.setAttribute("aria-label", "Drag goal to move");
+  dragHandle.addEventListener("dragstart", (event) => {
+    state.draggingGoalItem = { sectionId: section.id, goalId: goal.id };
+    item.classList.add("is-goal-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", goal.id);
+  });
+  dragHandle.addEventListener("dragend", clearGoalItemDrag);
+
+  item.addEventListener("dragover", (event) => {
+    const dragging = state.draggingGoalItem;
+    if (!dragging || dragging.goalId === goal.id) return;
+    event.preventDefault();
+    item.classList.add("is-goal-drop-target");
+  });
+  item.addEventListener("dragleave", () => {
+    item.classList.remove("is-goal-drop-target");
+  });
+  item.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    item.classList.remove("is-goal-drop-target");
+    const draggedId = event.dataTransfer.getData("text/plain") || state.draggingGoalItem?.goalId;
+    moveGoalToSection(state.draggingGoalItem?.sectionId, draggedId, section.id, goal.id);
+    clearGoalItemDrag();
+  });
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -2577,22 +2980,47 @@ function renderGoalItem(section, goal) {
   const actions = document.createElement("div");
   actions.className = "goal-item-actions";
 
-  const dateInput = document.createElement("input");
-  dateInput.className = "goal-date-input";
-  dateInput.type = "date";
-  dateInput.value = goal.dueDate || "";
-  dateInput.setAttribute("aria-label", "Goal calendar date");
-  dateInput.addEventListener("change", () => {
-    if (!dateInput.value) return;
-    if (goal.dueDate === dateInput.value) return;
+  const dateControl = document.createElement("span");
+  dateControl.className = "goal-date-picker-control";
+  dateControl.addEventListener("click", (event) => event.stopPropagation());
+
+  const dateButton = document.createElement("button");
+  dateButton.className = "goal-date-button";
+  dateButton.type = "button";
+  dateButton.textContent = "▦";
+  dateButton.title = goal.dueDate ? `Date: ${goal.dueDate}` : "Set date";
+  dateButton.setAttribute("aria-label", "Set goal calendar date");
+
+  const nativeDateInput = document.createElement("input");
+  nativeDateInput.className = "native-picker-input";
+  nativeDateInput.type = "date";
+  nativeDateInput.tabIndex = -1;
+  nativeDateInput.setAttribute("aria-hidden", "true");
+  nativeDateInput.value = goal.dueDate || "";
+
+  const applyGoalDate = (nextDateKey) => {
+    if (goal.dueDate === nextDateKey) return;
     queueUndo("goal date");
-    goal.dueDate = dateInput.value;
+    goal.dueDate = nextDateKey;
+    nativeDateInput.value = goal.dueDate;
     setCalendarDate(goal.dueDate);
     saveData();
     renderGoals();
     renderCalendar();
     renderSelectedDateNotes();
+  };
+
+  dateButton.addEventListener("click", () => {
+    const nextDateKey = goal.dueDate || currentDateKey();
+    nativeDateInput.value = nextDateKey;
+    openNativePicker(nativeDateInput);
   });
+  nativeDateInput.addEventListener("change", () => {
+    const nextDateKey = normalizeDateInput(nativeDateInput.value);
+    if (!nextDateKey) return;
+    applyGoalDate(nextDateKey);
+  });
+  dateControl.append(dateButton, nativeDateInput);
 
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
@@ -2632,19 +3060,52 @@ function renderGoalItem(section, goal) {
     renderCalendar();
     renderSelectedDateNotes();
   };
-  actions.append(makeSubtaskAddButton(goal, "goal", handleSubtaskChange), dateInput, deleteButton);
+  actions.append(makeSubtaskAddButton(goal, "goal", handleSubtaskChange), dateControl, deleteButton);
   goalLine.append(text);
   textWrap.append(goalLine, dateBadge, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
 
-  item.append(checkbox, textWrap, actions);
+  item.append(dragHandle, checkbox, textWrap, actions);
   resizeWrappingTextboxSoon(text);
   return item;
+}
+
+function moveGoalToSection(sourceSectionId, draggedId, targetSectionId, targetId = "") {
+  if (!sourceSectionId || !draggedId || !targetSectionId || draggedId === targetId) return;
+  const sourceLocation = findGoalSectionLocation(sourceSectionId);
+  const targetLocation = findGoalSectionLocation(targetSectionId);
+  if (!sourceLocation || !targetLocation) return;
+
+  const fromIndex = sourceLocation.section.goals.findIndex((itemGoal) => itemGoal.id === draggedId);
+  if (fromIndex === -1) return;
+
+  queueUndo(sourceSectionId === targetSectionId ? "goal order" : "goal box move");
+  const [movedGoal] = sourceLocation.section.goals.splice(fromIndex, 1);
+  let toIndex = targetLocation.section.goals.length;
+  if (targetId) {
+    toIndex = targetLocation.section.goals.findIndex((itemGoal) => itemGoal.id === targetId);
+    if (toIndex === -1) {
+      toIndex = targetLocation.section.goals.length;
+    }
+  }
+  targetLocation.section.goals.splice(toIndex, 0, movedGoal);
+  saveData();
+  renderGoals();
+  renderCalendar();
+  renderSelectedDateNotes();
+}
+
+function clearGoalItemDrag() {
+  state.draggingGoalItem = null;
+  els.goalSections.querySelectorAll(".is-goal-dragging, .is-goal-drop-target, .is-goal-list-drop-target, .is-goal-item-drop-target").forEach((item) => {
+    item.classList.remove("is-goal-dragging", "is-goal-drop-target", "is-goal-list-drop-target", "is-goal-item-drop-target");
+  });
 }
 
 function renderJournal() {
   els.journalLog.innerHTML = "";
   renderJournalLabelOptions();
   els.journalFilterDate.value = state.journalFilters.date;
+  els.journalFilterDatePicker.value = state.journalFilters.date;
   els.journalFilterMonth.value = state.journalFilters.month;
   els.journalFilterYear.value = state.journalFilters.year;
   const entries = filteredJournalEntries();
@@ -2745,6 +3206,10 @@ function makeEditableJournalText(entry) {
 function resizeJournalText(textarea) {
   textarea.style.height = "auto";
   textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+function resizeJournalFormText() {
+  resizeJournalText(els.journalText);
 }
 
 function resizeAllJournalTexts() {
