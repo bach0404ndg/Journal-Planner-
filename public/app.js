@@ -113,8 +113,7 @@ const state = {
   timePanelView: "timer",
   timeChartMode: "merged",
   editingSequenceEntryId: null,
-  editingLegendKey: null,
-  legendAddOpen: false,
+  historyAddOpen: false,
   timer: {
     status: "idle",
     dateKey: "",
@@ -3069,17 +3068,117 @@ function renderTimeSequenceList(dateKey) {
   var segments = getSequentialTimeSegments(dateKey);
   els.timeSequenceList.innerHTML = "";
 
-  if (!segments.length) {
+  if (!segments.length && !state.historyAddOpen) {
     var hint = document.createElement("span");
     hint.className = "time-legend-hint";
     hint.textContent = "No time tracked yet";
     els.timeSequenceList.append(hint);
-    return;
   }
 
   segments.forEach(function (segment) {
     els.timeSequenceList.append(makeSequenceRow(segment));
   });
+
+  els.timeSequenceList.append(makeHistoryAddRow());
+}
+
+function makeHistoryAddRow() {
+  if (state.historyAddOpen) {
+    var row = document.createElement("div");
+    row.className = "time-legend-item time-legend-add-row is-editing";
+
+    var select = document.createElement("select");
+    select.setAttribute("aria-label", "Task to add tracked time for");
+    populateTaskSelectOptions(select);
+
+    var durationMask = document.createElement("div");
+    durationMask.className = "duration-mask time-legend-duration";
+    var hoursInput = document.createElement("input");
+    hoursInput.type = "text";
+    hoursInput.inputMode = "numeric";
+    hoursInput.maxLength = 2;
+    hoursInput.setAttribute("aria-label", "Hours");
+    var hoursUnit = document.createElement("span");
+    hoursUnit.className = "duration-mask-unit";
+    hoursUnit.textContent = "h";
+    var minutesInput = document.createElement("input");
+    minutesInput.type = "text";
+    minutesInput.inputMode = "numeric";
+    minutesInput.maxLength = 2;
+    minutesInput.setAttribute("aria-label", "Minutes");
+    var minutesUnit = document.createElement("span");
+    minutesUnit.className = "duration-mask-unit";
+    minutesUnit.textContent = "m";
+    hoursInput.value = "00";
+    minutesInput.value = "00";
+    bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
+    bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
+    durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
+
+    var confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = "time-legend-edit";
+    confirmButton.textContent = "✓";
+    confirmButton.setAttribute("aria-label", "Confirm add time");
+    confirmButton.addEventListener("click", function () {
+      var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
+      if (seconds <= 0) {
+        durationMask.classList.add("is-invalid");
+        return;
+      }
+      durationMask.classList.remove("is-invalid");
+
+      var selection = select.value;
+      var parts = selection ? selection.split(":") : ["", ""];
+      var taskId = parts[0];
+      var subtaskId = parts[1] || "";
+      var note = taskId ? (state.data.calendarNotes[state.selectedDate] || []).find(function (item) { return item.id === taskId; }) : null;
+      var subtask = subtaskId && note ? (note.subtasks || []).find(function (item) { return item.id === subtaskId; }) : null;
+
+      state.historyAddOpen = false;
+
+      addTimeEntry(state.selectedDate, {
+        id: makeId("time"),
+        taskId: taskId,
+        taskText: taskId ? (note ? note.text : "") : timeBreakLabel,
+        seconds: seconds,
+        color: note ? note.color : "",
+        subtaskId: subtaskId,
+        subtaskText: subtask ? subtask.text : "",
+        startedAt: "",
+        endedAt: new Date().toISOString(),
+      });
+    });
+
+    var cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "time-legend-delete";
+    cancelButton.textContent = "×";
+    cancelButton.setAttribute("aria-label", "Cancel adding time");
+    cancelButton.addEventListener("click", function () {
+      state.historyAddOpen = false;
+      renderTimePie();
+    });
+
+    row.append(select, durationMask, confirmButton, cancelButton);
+    return row;
+  }
+
+  var addButton = document.createElement("button");
+  addButton.className = "time-legend-inline-add";
+  addButton.type = "button";
+  addButton.textContent = "+";
+  addButton.setAttribute("aria-label", "Add tracked time");
+  addButton.addEventListener("click", function () {
+    state.editingSequenceEntryId = null;
+    state.historyAddOpen = true;
+    renderTimePie();
+  });
+
+  var wrapper = document.createElement("div");
+  wrapper.className = "time-legend-item time-legend-add-wrapper";
+  wrapper.append(addButton);
+  return wrapper;
 }
 
 function makeSequenceRow(segment) {
@@ -3230,8 +3329,7 @@ function renderTimePie() {
 function setTimeChartMode(mode) {
   state.timeChartMode = mode;
   state.editingSequenceEntryId = null;
-  state.editingLegendKey = null;
-  state.legendAddOpen = false;
+  state.historyAddOpen = false;
   els.timeChartArea.hidden = mode !== "merged";
   els.timerControls.hidden = mode !== "merged";
   els.timeSequenceList.hidden = mode !== "sequence";
@@ -3242,22 +3340,18 @@ function setTimeChartMode(mode) {
 
 function renderTimeLegend(buckets) {
   els.timeLegend.innerHTML = "";
-  var liveBucketKey = state.timer.status !== "idle" && state.timer.dateKey === state.selectedDate
-    ? (state.timer.taskId || "break")
-    : null;
 
-  if (!buckets.length && !state.legendAddOpen) {
+  if (!buckets.length) {
     var hint = document.createElement("span");
     hint.className = "time-legend-hint";
     hint.textContent = "No time tracked yet";
     els.timeLegend.append(hint);
+    return;
   }
 
   buckets.forEach(function (bucket) {
-    els.timeLegend.append(makeTimeLegendRow(bucket, bucket.key === liveBucketKey));
+    els.timeLegend.append(makeTimeLegendRow(bucket, false));
   });
-
-  els.timeLegend.append(makeLegendAddRow());
 }
 
 function makeTimeLegendRow(bucket, isLive) {
@@ -3271,246 +3365,17 @@ function makeTimeLegendRow(bucket, isLive) {
   label.className = "time-legend-label";
   label.textContent = bucket.key === "break" ? timeBreakLabel : bucket.label;
   label.title = label.textContent;
-  item.append(swatch, label);
-
-  if (isLive) {
-    var seconds = document.createElement("span");
-    seconds.className = "time-legend-seconds";
-    seconds.textContent = formatHoursMinutes(bucket.seconds);
-    item.append(seconds);
-    return item;
-  }
-
-  if (state.editingLegendKey === bucket.key) {
-    item.classList.add("is-editing");
-
-    var durationMask = document.createElement("div");
-    durationMask.className = "duration-mask time-legend-duration";
-    var hoursInput = document.createElement("input");
-    hoursInput.type = "text";
-    hoursInput.inputMode = "numeric";
-    hoursInput.maxLength = 2;
-    hoursInput.setAttribute("aria-label", "Hours for " + label.textContent);
-    var hoursUnit = document.createElement("span");
-    hoursUnit.className = "duration-mask-unit";
-    hoursUnit.textContent = "h";
-    var minutesInput = document.createElement("input");
-    minutesInput.type = "text";
-    minutesInput.inputMode = "numeric";
-    minutesInput.maxLength = 2;
-    minutesInput.setAttribute("aria-label", "Minutes for " + label.textContent);
-    var minutesUnit = document.createElement("span");
-    minutesUnit.className = "duration-mask-unit";
-    minutesUnit.textContent = "m";
-    writeDurationMaskSeconds(hoursInput, minutesInput, bucket.seconds);
-    bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
-    bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
-    durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
-
-    var saveButton = document.createElement("button");
-    saveButton.type = "button";
-    saveButton.className = "time-legend-edit";
-    saveButton.textContent = "✓";
-    saveButton.setAttribute("aria-label", "Save time for " + label.textContent);
-    saveButton.addEventListener("click", function () {
-      commitTimeBucketDuration(bucket, hoursInput, minutesInput, durationMask);
-    });
-
-    var cancelButton = document.createElement("button");
-    cancelButton.type = "button";
-    cancelButton.className = "time-legend-delete";
-    cancelButton.textContent = "×";
-    cancelButton.setAttribute("aria-label", "Cancel editing " + label.textContent);
-    cancelButton.addEventListener("click", function () {
-      state.editingLegendKey = null;
-      renderTimePie();
-    });
-
-    item.append(durationMask, saveButton, cancelButton);
-    return item;
-  }
 
   var timeText = document.createElement("span");
   timeText.className = "time-legend-seconds";
   timeText.textContent = formatHoursMinutes(bucket.seconds);
-  item.append(timeText);
 
-  var editButton = document.createElement("button");
-  editButton.type = "button";
-  editButton.className = "time-legend-edit";
-  editButton.textContent = "✎";
-  editButton.setAttribute("aria-label", "Edit time for " + label.textContent);
-  editButton.addEventListener("click", function () {
-    state.editingLegendKey = bucket.key;
-    state.legendAddOpen = false;
-    renderTimePie();
-  });
-
-  var deleteButton = document.createElement("button");
-  deleteButton.type = "button";
-  deleteButton.className = "time-legend-delete";
-  deleteButton.textContent = "×";
-  deleteButton.setAttribute("aria-label", "Delete tracked time for " + label.textContent);
-  deleteButton.addEventListener("click", function () {
-    deleteTimeBucket(bucket.key);
-  });
-
-  item.append(editButton, deleteButton);
+  item.append(swatch, label, timeText);
   return item;
-}
-
-function makeLegendAddRow() {
-  if (state.legendAddOpen) {
-    var row = document.createElement("div");
-    row.className = "time-legend-item time-legend-add-row is-editing";
-
-    var select = document.createElement("select");
-    select.setAttribute("aria-label", "Task to add tracked time for");
-    populateTaskSelectOptions(select);
-
-    var durationMask = document.createElement("div");
-    durationMask.className = "duration-mask time-legend-duration";
-    var hoursInput = document.createElement("input");
-    hoursInput.type = "text";
-    hoursInput.inputMode = "numeric";
-    hoursInput.maxLength = 2;
-    hoursInput.setAttribute("aria-label", "Hours");
-    var hoursUnit = document.createElement("span");
-    hoursUnit.className = "duration-mask-unit";
-    hoursUnit.textContent = "h";
-    var minutesInput = document.createElement("input");
-    minutesInput.type = "text";
-    minutesInput.inputMode = "numeric";
-    minutesInput.maxLength = 2;
-    minutesInput.setAttribute("aria-label", "Minutes");
-    var minutesUnit = document.createElement("span");
-    minutesUnit.className = "duration-mask-unit";
-    minutesUnit.textContent = "m";
-    hoursInput.value = "00";
-    minutesInput.value = "00";
-    bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
-    bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
-    durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
-
-    var confirmButton = document.createElement("button");
-    confirmButton.type = "button";
-    confirmButton.className = "time-legend-edit";
-    confirmButton.textContent = "✓";
-    confirmButton.setAttribute("aria-label", "Confirm add time");
-    confirmButton.addEventListener("click", function () {
-      var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
-      if (seconds <= 0) {
-        durationMask.classList.add("is-invalid");
-        return;
-      }
-      durationMask.classList.remove("is-invalid");
-
-      var selection = select.value;
-      var parts = selection ? selection.split(":") : ["", ""];
-      var taskId = parts[0];
-      var subtaskId = parts[1] || "";
-      var note = taskId ? (state.data.calendarNotes[state.selectedDate] || []).find(function (item) { return item.id === taskId; }) : null;
-      var subtask = subtaskId && note ? (note.subtasks || []).find(function (item) { return item.id === subtaskId; }) : null;
-
-      state.legendAddOpen = false;
-
-      addTimeEntry(state.selectedDate, {
-        id: makeId("time"),
-        taskId: taskId,
-        taskText: taskId ? (note ? note.text : "") : timeBreakLabel,
-        seconds: seconds,
-        color: note ? note.color : "",
-        subtaskId: subtaskId,
-        subtaskText: subtask ? subtask.text : "",
-        startedAt: "",
-        endedAt: new Date().toISOString(),
-      });
-    });
-
-    var cancelButton = document.createElement("button");
-    cancelButton.type = "button";
-    cancelButton.className = "time-legend-delete";
-    cancelButton.textContent = "×";
-    cancelButton.setAttribute("aria-label", "Cancel adding time");
-    cancelButton.addEventListener("click", function () {
-      state.legendAddOpen = false;
-      renderTimePie();
-    });
-
-    row.append(select, durationMask, confirmButton, cancelButton);
-    return row;
-  }
-
-  var addButton = document.createElement("button");
-  addButton.className = "time-legend-inline-add";
-  addButton.type = "button";
-  addButton.textContent = "+";
-  addButton.setAttribute("aria-label", "Add tracked time");
-  addButton.addEventListener("click", function () {
-    state.editingLegendKey = null;
-    state.legendAddOpen = true;
-    renderTimePie();
-  });
-
-  var wrapper = document.createElement("div");
-  wrapper.className = "time-legend-item time-legend-add-wrapper";
-  wrapper.append(addButton);
-  return wrapper;
-}
-
-function replaceTimeBucketEntries(dateKey, bucketKey, newEntry) {
-  var entries = getDayTimeEntries(dateKey).filter(function (entry) {
-    return (entry.taskId || "break") !== bucketKey;
-  });
-  if (newEntry) entries.push(newEntry);
-  if (entries.length) {
-    state.data.timeEntries[dateKey] = entries;
-  } else {
-    delete state.data.timeEntries[dateKey];
-  }
-}
-
-function commitTimeBucketDuration(bucket, hoursInput, minutesInput, durationMask) {
-  var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
-  if (seconds <= 0) {
-    durationMask.classList.add("is-invalid");
-    return;
-  }
-  durationMask.classList.remove("is-invalid");
-  if (seconds === bucket.seconds) {
-    state.editingLegendKey = null;
-    renderTimePie();
-    return;
-  }
-
-  queueUndo("time entry edit");
-  replaceTimeBucketEntries(state.selectedDate, bucket.key, {
-    id: makeId("time"),
-    taskId: bucket.key === "break" ? "" : bucket.key,
-    taskText: bucket.key === "break" ? timeBreakLabel : bucket.label,
-    seconds: seconds,
-    color: bucket.color,
-    subtaskId: "",
-    subtaskText: "",
-    startedAt: "",
-    endedAt: new Date().toISOString(),
-  });
-  state.editingLegendKey = null;
-  saveData();
-  renderTimePie();
-}
-
-function deleteTimeBucket(bucketKey) {
-  queueUndo("time entry removal");
-  replaceTimeBucketEntries(state.selectedDate, bucketKey, null);
-  saveData();
-  renderTimePie();
 }
 
 function setTimePanelView(view) {
   state.timePanelView = view;
-  state.legendAddOpen = false;
-  state.editingLegendKey = null;
   els.timeLegend.hidden = false;
   els.timeLegendAdd.hidden = true;
   els.timerSession.hidden = false;
