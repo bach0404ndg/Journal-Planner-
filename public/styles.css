@@ -2726,6 +2726,61 @@ textarea:focus {
   color: var(--green-meta);
 }
 
+.time-legend-edit {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(22, 51, 33, 0.4);
+  background: transparent;
+  font-size: 0.62rem;
+}
+
+.time-legend-edit:hover {
+  color: var(--green-meta);
+  background: rgba(var(--green-rgb), 0.1);
+}
+
+.time-legend-item.is-editing {
+  display: block;
+}
+
+.time-legend-editor {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(var(--green-rgb), 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.time-legend-editor-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.time-legend-editor-task {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.time-legend-editor-duration {
+  flex: 0 0 62px;
+  text-align: center;
+}
+
+.time-legend-editor-row .ghost-button {
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 0.68rem;
+}
+
 .timer-controls {
   display: grid;
   gap: 8px;

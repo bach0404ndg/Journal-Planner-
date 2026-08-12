@@ -110,6 +110,7 @@ const state = {
   draggingCalendarTask: null,
   undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
+  editingTimeBucket: null,
   timer: {
     status: "idle",
     dateKey: "",
@@ -2642,6 +2643,7 @@ function startTimer() {
   }
   els.timerDurationInput.classList.remove("is-invalid");
   ensureAudioContext();
+  state.editingTimeBucket = null;
 
   var selection = els.timerTaskSelect.value;
   var parts = selection ? selection.split(":") : ["", ""];
@@ -2869,9 +2871,24 @@ function renderTimePie() {
 function renderTimeLegend(buckets) {
   els.timeLegend.innerHTML = "";
   els.timeLegend.hidden = !buckets.length;
+  var liveBucketKey = state.timer.status !== "idle" && state.timer.dateKey === state.selectedDate
+    ? (state.timer.taskId || "break")
+    : null;
+  var editing = state.editingTimeBucket && state.editingTimeBucket.dateKey === state.selectedDate
+    ? state.editingTimeBucket.key
+    : null;
+
   buckets.forEach(function (bucket) {
     var item = document.createElement("div");
     item.className = "time-legend-item";
+
+    if (editing === bucket.key) {
+      item.classList.add("is-editing");
+      item.append(makeTimeBucketEditor(bucket));
+      els.timeLegend.append(item);
+      return;
+    }
+
     var swatch = document.createElement("span");
     swatch.className = "time-legend-swatch";
     swatch.style.background = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
@@ -2883,8 +2900,132 @@ function renderTimeLegend(buckets) {
     seconds.className = "time-legend-seconds";
     seconds.textContent = formatHoursMinutes(bucket.seconds);
     item.append(swatch, label, seconds);
+
+    if (bucket.key !== liveBucketKey) {
+      var editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "time-legend-edit";
+      editButton.textContent = "✎";
+      editButton.setAttribute("aria-label", "Edit tracked time for " + label.textContent);
+      editButton.addEventListener("click", function () {
+        state.editingTimeBucket = { dateKey: state.selectedDate, key: bucket.key };
+        renderTimePie();
+      });
+      item.append(editButton);
+    }
+
     els.timeLegend.append(item);
   });
+}
+
+function makeTimeBucketEditor(bucket) {
+  var wrap = document.createElement("div");
+  wrap.className = "time-legend-editor";
+
+  var taskSelect = document.createElement("select");
+  taskSelect.className = "time-legend-editor-task";
+  taskSelect.setAttribute("aria-label", "Reassign tracked time to task");
+  taskSelect.append(makeOption("", timeBreakLabel));
+  sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []).forEach(function (note) {
+    taskSelect.append(makeOption(note.id, note.text));
+  });
+  var currentValue = bucket.key === "break" ? "" : bucket.key;
+  if (currentValue && !taskSelect.querySelector("option[value=\"" + currentValue + "\"]")) {
+    taskSelect.prepend(makeOption(currentValue, bucket.label));
+  }
+  taskSelect.value = currentValue;
+
+  var durationInput = document.createElement("input");
+  durationInput.type = "text";
+  durationInput.className = "time-legend-editor-duration";
+  durationInput.setAttribute("aria-label", "Tracked duration for " + bucket.label);
+  durationInput.value = formatHoursMinutes(bucket.seconds);
+  durationInput.addEventListener("input", function () {
+    durationInput.classList.remove("is-invalid");
+  });
+
+  var saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "ghost-button";
+  saveButton.textContent = "Save";
+  saveButton.addEventListener("click", function () {
+    saveTimeBucketEdit(bucket.key, taskSelect.value, durationInput.value, durationInput);
+  });
+
+  var deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "ghost-button";
+  deleteButton.textContent = "Delete";
+  deleteButton.addEventListener("click", function () {
+    deleteTimeBucket(bucket.key);
+  });
+
+  var cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.className = "ghost-button";
+  cancelButton.textContent = "Cancel";
+  cancelButton.addEventListener("click", function () {
+    state.editingTimeBucket = null;
+    renderTimePie();
+  });
+
+  var fieldsRow = document.createElement("div");
+  fieldsRow.className = "time-legend-editor-row";
+  fieldsRow.append(taskSelect, durationInput);
+
+  var buttonsRow = document.createElement("div");
+  buttonsRow.className = "time-legend-editor-row";
+  buttonsRow.append(saveButton, deleteButton, cancelButton);
+
+  wrap.append(fieldsRow, buttonsRow);
+  return wrap;
+}
+
+function replaceTimeBucketEntries(dateKey, bucketKey, newEntry) {
+  var entries = getDayTimeEntries(dateKey).filter(function (entry) {
+    return (entry.taskId || "break") !== bucketKey;
+  });
+  if (newEntry) entries.push(newEntry);
+  if (entries.length) {
+    state.data.timeEntries[dateKey] = entries;
+  } else {
+    delete state.data.timeEntries[dateKey];
+  }
+}
+
+function saveTimeBucketEdit(bucketKey, newTaskId, durationText, durationInput) {
+  var seconds = parseDurationInput(durationText);
+  if (seconds <= 0) {
+    durationInput.classList.add("is-invalid");
+    return;
+  }
+  var dateKey = state.selectedDate;
+  var note = newTaskId ? (state.data.calendarNotes[dateKey] || []).find(function (item) { return item.id === newTaskId; }) : null;
+
+  queueUndo("time entry edit");
+  replaceTimeBucketEntries(dateKey, bucketKey, {
+    id: makeId("time"),
+    taskId: newTaskId || "",
+    taskText: newTaskId ? (note ? note.text : "") : timeBreakLabel,
+    seconds: seconds,
+    color: note ? note.color : "",
+    subtaskId: "",
+    subtaskText: "",
+    startedAt: "",
+    endedAt: new Date().toISOString(),
+  });
+  state.editingTimeBucket = null;
+  saveData();
+  renderTimePie();
+}
+
+function deleteTimeBucket(bucketKey) {
+  if (!window.confirm("Remove tracked time for this task today?")) return;
+  queueUndo("time entry removal");
+  replaceTimeBucketEntries(state.selectedDate, bucketKey, null);
+  state.editingTimeBucket = null;
+  saveData();
+  renderTimePie();
 }
 
 /* Task selector */
