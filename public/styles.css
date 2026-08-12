@@ -2648,7 +2648,7 @@ textarea:focus {
 }
 
 .time-chart-area {
-  flex: 0 1 210px;
+  flex: 1 1 210px;
   min-height: 100px;
   display: flex;
   align-items: center;
@@ -2900,7 +2900,9 @@ textarea:focus {
   gap: 6px;
   width: 100%;
   max-width: 260px;
-  margin: 0 auto;
+  margin-top: auto;
+  margin-left: auto;
+  margin-right: auto;
   padding-top: 16px;
   border-top: 1px solid rgba(22, 51, 33, 0.1);
 }
