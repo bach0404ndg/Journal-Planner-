@@ -80,13 +80,15 @@
                   <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
                 </div>
 
-                <div class="time-chart">
-                  <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
-                    <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
-                    <g id="timePieSlices"></g>
-                  </svg>
-                  <div class="time-chart-center">
-                    <span class="time-chart-total" id="timeChartTotal">0h 0m</span>
+                <div class="time-chart-area">
+                  <div class="time-chart">
+                    <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
+                      <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
+                      <g id="timePieSlices"></g>
+                    </svg>
+                    <div class="time-chart-center">
+                      <span class="time-chart-total" id="timeChartTotal">0h 0m</span>
+                    </div>
                   </div>
                 </div>
                 <div class="time-legend" id="timeLegend" hidden></div>
@@ -99,7 +101,12 @@
                     </label>
                     <label class="timer-duration-field">
                       <span>Duration</span>
-                      <input id="timerDurationInput" type="text" placeholder="25m" value="25m">
+                      <div class="duration-mask" id="timerDurationMask">
+                        <input id="timerDurationHours" type="text" inputmode="numeric" maxlength="2" value="00" aria-label="Hours">
+                        <span class="duration-mask-unit">h</span>
+                        <input id="timerDurationMinutes" type="text" inputmode="numeric" maxlength="2" value="25" aria-label="Minutes">
+                        <span class="duration-mask-unit">m</span>
+                      </div>
                     </label>
                   </div>
                   <div class="timer-display" id="timerDisplay">

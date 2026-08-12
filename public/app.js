@@ -188,7 +188,9 @@ const els = {
   timeChartTotal: document.querySelector("#timeChartTotal"),
   timeLegend: document.querySelector("#timeLegend"),
   timerTaskSelect: document.querySelector("#timerTaskSelect"),
-  timerDurationInput: document.querySelector("#timerDurationInput"),
+  timerDurationMask: document.querySelector("#timerDurationMask"),
+  timerDurationHours: document.querySelector("#timerDurationHours"),
+  timerDurationMinutes: document.querySelector("#timerDurationMinutes"),
   timerDisplay: document.querySelector("#timerDisplay"),
   timerTimeText: document.querySelector("#timerTimeText"),
   timerStatusText: document.querySelector("#timerStatusText"),
@@ -891,8 +893,11 @@ function bindEvents() {
   els.timerContinueButton.addEventListener("click", continueTimer);
   els.timerEndButton.addEventListener("click", function () { stopTimer(true); });
   els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
-  els.timerDurationInput.addEventListener("input", function () {
-    els.timerDurationInput.classList.remove("is-invalid");
+  bindDurationMaskInput(els.timerDurationHours, 99, function () {
+    els.timerDurationMask.classList.remove("is-invalid");
+  });
+  bindDurationMaskInput(els.timerDurationMinutes, 59, function () {
+    els.timerDurationMask.classList.remove("is-invalid");
   });
   els.showBreakInChartCheckbox.addEventListener("change", renderTimePie);
   window.addEventListener("beforeunload", (event) => {
@@ -2584,18 +2589,38 @@ function clearDayTimeEntries() {
   renderTimePie();
 }
 
-function parseDurationInput(text) {
-  var value = String(text || "").trim().toLowerCase();
-  if (!value) return 0;
-  var match = value.match(/^(\d{1,2}):(\d{2})$/);
-  if (match) return (Number(match[1]) * 60 + Number(match[2])) * 60;
-  match = value.match(/^(\d+(?:\.\d+)?)\s*h(?:\s*(\d{1,2})\s*m?)?$/);
-  if (match) return Math.round(Number(match[1]) * 3600 + Number(match[2] || 0) * 60);
-  match = value.match(/^(\d+)\s*m$/);
-  if (match) return Number(match[1]) * 60;
-  match = value.match(/^(\d+)$/);
-  if (match) return Number(match[1]) * 60;
-  return 0;
+function readDurationMaskSeconds(hoursInput, minutesInput) {
+  var hours = Math.max(0, parseInt(hoursInput.value, 10) || 0);
+  var minutes = Math.max(0, Math.min(59, parseInt(minutesInput.value, 10) || 0));
+  return hours * 3600 + minutes * 60;
+}
+
+function writeDurationMaskSeconds(hoursInput, minutesInput, totalSeconds) {
+  var total = Math.max(0, Math.floor(totalSeconds));
+  var hours = Math.floor(total / 3600);
+  var minutes = Math.round((total % 3600) / 60);
+  if (minutes >= 60) {
+    minutes = 0;
+    hours += 1;
+  }
+  hoursInput.value = String(hours).padStart(2, "0");
+  minutesInput.value = String(minutes).padStart(2, "0");
+}
+
+function sanitizeDurationMaskInput(input, max) {
+  var digits = input.value.replace(/\D/g, "").slice(0, 2);
+  if (digits && Number(digits) > max) digits = String(max);
+  input.value = digits;
+}
+
+function bindDurationMaskInput(input, max, onChange) {
+  input.addEventListener("input", function () {
+    sanitizeDurationMaskInput(input, max);
+    if (onChange) onChange();
+  });
+  input.addEventListener("blur", function () {
+    input.value = String(Math.max(0, parseInt(input.value, 10) || 0)).padStart(2, "0");
+  });
 }
 
 function formatCountdown(totalSeconds) {
@@ -2636,12 +2661,12 @@ function stopTick() {
 
 function startTimer() {
   if (state.timer.status === "running") return;
-  var seconds = parseDurationInput(els.timerDurationInput.value);
+  var seconds = readDurationMaskSeconds(els.timerDurationHours, els.timerDurationMinutes);
   if (seconds <= 0) {
-    els.timerDurationInput.classList.add("is-invalid");
+    els.timerDurationMask.classList.add("is-invalid");
     return;
   }
-  els.timerDurationInput.classList.remove("is-invalid");
+  els.timerDurationMask.classList.remove("is-invalid");
   ensureAudioContext();
   state.editingTimeBucket = null;
 
@@ -2710,7 +2735,7 @@ function finishTimer() {
 }
 
 function continueTimer() {
-  var extra = parseDurationInput(els.timerDurationInput.value) || defaultTimerMinutes * 60;
+  var extra = readDurationMaskSeconds(els.timerDurationHours, els.timerDurationMinutes) || defaultTimerMinutes * 60;
   state.timer.durationSeconds += extra;
   state.timer.status = "running";
   state.timer.sessionStartEpoch = Date.now();
@@ -2935,21 +2960,35 @@ function makeTimeBucketEditor(bucket) {
   }
   taskSelect.value = currentValue;
 
-  var durationInput = document.createElement("input");
-  durationInput.type = "text";
-  durationInput.className = "time-legend-editor-duration";
-  durationInput.setAttribute("aria-label", "Tracked duration for " + bucket.label);
-  durationInput.value = formatHoursMinutes(bucket.seconds);
-  durationInput.addEventListener("input", function () {
-    durationInput.classList.remove("is-invalid");
-  });
+  var durationMask = document.createElement("div");
+  durationMask.className = "duration-mask";
+  var hoursInput = document.createElement("input");
+  hoursInput.type = "text";
+  hoursInput.inputMode = "numeric";
+  hoursInput.maxLength = 2;
+  hoursInput.setAttribute("aria-label", "Hours tracked for " + bucket.label);
+  var hoursUnit = document.createElement("span");
+  hoursUnit.className = "duration-mask-unit";
+  hoursUnit.textContent = "h";
+  var minutesInput = document.createElement("input");
+  minutesInput.type = "text";
+  minutesInput.inputMode = "numeric";
+  minutesInput.maxLength = 2;
+  minutesInput.setAttribute("aria-label", "Minutes tracked for " + bucket.label);
+  var minutesUnit = document.createElement("span");
+  minutesUnit.className = "duration-mask-unit";
+  minutesUnit.textContent = "m";
+  writeDurationMaskSeconds(hoursInput, minutesInput, bucket.seconds);
+  bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
+  bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
+  durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
 
   var saveButton = document.createElement("button");
   saveButton.type = "button";
   saveButton.className = "ghost-button";
   saveButton.textContent = "Save";
   saveButton.addEventListener("click", function () {
-    saveTimeBucketEdit(bucket.key, taskSelect.value, durationInput.value, durationInput);
+    saveTimeBucketEdit(bucket.key, taskSelect.value, hoursInput, minutesInput, durationMask);
   });
 
   var deleteButton = document.createElement("button");
@@ -2971,7 +3010,7 @@ function makeTimeBucketEditor(bucket) {
 
   var fieldsRow = document.createElement("div");
   fieldsRow.className = "time-legend-editor-row";
-  fieldsRow.append(taskSelect, durationInput);
+  fieldsRow.append(taskSelect, durationMask);
 
   var buttonsRow = document.createElement("div");
   buttonsRow.className = "time-legend-editor-row";
@@ -2993,10 +3032,10 @@ function replaceTimeBucketEntries(dateKey, bucketKey, newEntry) {
   }
 }
 
-function saveTimeBucketEdit(bucketKey, newTaskId, durationText, durationInput) {
-  var seconds = parseDurationInput(durationText);
+function saveTimeBucketEdit(bucketKey, newTaskId, hoursInput, minutesInput, durationMask) {
+  var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
   if (seconds <= 0) {
-    durationInput.classList.add("is-invalid");
+    durationMask.classList.add("is-invalid");
     return;
   }
   var dateKey = state.selectedDate;
