@@ -2889,7 +2889,10 @@ textarea:focus {
   gap: 6px;
   width: 100%;
   max-width: 260px;
-  margin: 0 auto;
+  margin-top: auto;
+  margin-left: auto;
+  margin-right: auto;
+  padding-top: 14px;
 }
 
 .timer-controls[hidden] {
