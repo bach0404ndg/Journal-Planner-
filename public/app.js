@@ -112,7 +112,7 @@ const state = {
   journalFilters: { date: "", month: "", year: "", label: "" },
   timePanelView: "timer",
   timeChartMode: "merged",
-  pinnedChartSegmentKey: null,
+  editingSequenceEntryId: null,
   timer: {
     status: "idle",
     dateKey: "",
@@ -190,6 +190,9 @@ const els = {
   timeChartTotal: document.querySelector("#timeChartTotal"),
   timeChartModeMergedButton: document.querySelector("#timeChartModeMergedButton"),
   timeChartModeSequenceButton: document.querySelector("#timeChartModeSequenceButton"),
+  timeChartArea: document.querySelector("#timeChartArea"),
+  timeSequenceList: document.querySelector("#timeSequenceList"),
+  timerControls: document.querySelector("#timerControls"),
   timeLegend: document.querySelector("#timeLegend"),
   timeLegendAdd: document.querySelector("#timeLegendAdd"),
   legendAddTaskSelect: document.querySelector("#legendAddTaskSelect"),
@@ -902,7 +905,7 @@ function bindEvents() {
   /* Timer event bindings */
   els.timerStartButton.addEventListener("click", startTimer);
   els.timerPauseButton.addEventListener("click", pauseTimer);
-  els.timerStopButton.addEventListener("click", function () { stopTimer(true); });
+  els.timerStopButton.addEventListener("click", confirmStopTimer);
   els.timerContinueButton.addEventListener("click", continueTimer);
   els.timerEndButton.addEventListener("click", function () { stopTimer(true); });
   els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
@@ -922,11 +925,6 @@ function bindEvents() {
   });
   els.timeChartModeSequenceButton.addEventListener("click", function () {
     setTimeChartMode("sequence");
-  });
-  els.timePieChart.addEventListener("click", function () {
-    if (!state.pinnedChartSegmentKey) return;
-    state.pinnedChartSegmentKey = null;
-    updateChartCenterDisplay();
   });
   bindDurationMaskInput(els.legendAddDurationHours, 99, function () {
     els.legendAddDurationMask.classList.remove("is-invalid");
@@ -1704,6 +1702,8 @@ function renderAll() {
   renderSpecialTasks();
   renderCalendar();
   setTimePanelView(state.timePanelView);
+  els.timeChartArea.hidden = state.timeChartMode !== "merged";
+  els.timeSequenceList.hidden = state.timeChartMode !== "sequence";
   els.timeChartModeMergedButton.classList.toggle("is-active", state.timeChartMode === "merged");
   els.timeChartModeSequenceButton.classList.toggle("is-active", state.timeChartMode === "sequence");
   renderTimePie();
@@ -2799,6 +2799,17 @@ function adjustTimerDuration(deltaSeconds) {
   renderTimerDisplay();
 }
 
+function confirmStopTimer() {
+  if (state.timer.status === "idle") return;
+  var elapsed = liveElapsedSeconds();
+  if (elapsed <= 0) {
+    stopTimer(false);
+    return;
+  }
+  var shouldSave = window.confirm("Save " + formatHoursMinutes(elapsed) + " of tracked time for this session?");
+  stopTimer(shouldSave);
+}
+
 function stopTimer(save) {
   if (state.timer.status === "idle") return;
   stopTick();
@@ -2989,18 +3000,9 @@ function getSequentialTimeSegments(dateKey) {
   });
 }
 
-function renderTimePie() {
-  var buckets = getDayTimeBuckets(state.selectedDate);
-  var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
-  var segments = state.timeChartMode === "sequence"
-    ? getSequentialTimeSegments(state.selectedDate)
-    : getMergedTimeSegments(buckets);
-
-  state.lastChartSegments = segments;
+function renderPieSlices(buckets, total) {
+  var segments = getMergedTimeSegments(buckets);
   state.lastChartTotalSeconds = total;
-  if (state.pinnedChartSegmentKey && !segments.some(function (s) { return s.key === state.pinnedChartSegmentKey; })) {
-    state.pinnedChartSegmentKey = null;
-  }
 
   els.timePieSlices.innerHTML = "";
   var offset = 0;
@@ -3026,22 +3028,14 @@ function renderTimePie() {
       els.timeChartTotal.textContent = formatHoursMinutes(segment.seconds);
     });
     slice.addEventListener("pointerleave", function () {
-      updateChartCenterDisplay();
+      els.timeChartTotal.textContent = formatHoursMinutes(state.lastChartTotalSeconds || 0);
     });
-    if (state.timeChartMode === "sequence") {
-      slice.classList.add("is-pinnable");
-      slice.addEventListener("click", function (event) {
-        event.stopPropagation();
-        state.pinnedChartSegmentKey = state.pinnedChartSegmentKey === segment.key ? null : segment.key;
-        updateChartCenterDisplay();
-      });
-    }
 
     els.timePieSlices.append(slice);
     offset += fraction;
   });
 
-  updateChartCenterDisplay();
+  els.timeChartTotal.textContent = formatHoursMinutes(total);
   if (total > 0) {
     var labelText = segments.map(function (s) {
       return s.label + " " + formatHoursMinutes(s.seconds);
@@ -3050,24 +3044,176 @@ function renderTimePie() {
   } else {
     els.timePieChart.setAttribute("aria-label", "No time tracked");
   }
-  renderTimeLegend(buckets);
 }
 
-function updateChartCenterDisplay() {
-  var pinnedKey = state.timeChartMode === "sequence" ? state.pinnedChartSegmentKey : null;
-  if (pinnedKey) {
-    var segment = (state.lastChartSegments || []).find(function (s) { return s.key === pinnedKey; });
-    if (segment) {
-      els.timeChartTotal.textContent = formatHoursMinutes(segment.seconds);
-      return;
-    }
+function renderTimeSequenceList(dateKey) {
+  var segments = getSequentialTimeSegments(dateKey);
+  els.timeSequenceList.innerHTML = "";
+
+  if (!segments.length) {
+    var hint = document.createElement("span");
+    hint.className = "time-legend-hint";
+    hint.textContent = "No time tracked yet";
+    els.timeSequenceList.append(hint);
+    return;
   }
-  els.timeChartTotal.textContent = formatHoursMinutes(state.lastChartTotalSeconds || 0);
+
+  segments.forEach(function (segment) {
+    els.timeSequenceList.append(makeSequenceRow(segment));
+  });
+}
+
+function makeSequenceRow(segment) {
+  var isLive = segment.key === "__live__";
+  var item = document.createElement("div");
+  item.className = "time-legend-item";
+
+  var swatch = document.createElement("span");
+  swatch.className = "time-legend-swatch";
+  var baseColor = segment.taskKey === "break" ? breakTrackColor.color : getCalendarTaskColor(segment.color).color;
+  swatch.style.background = segment.isSubtask ? lightenHexColor(baseColor, SUBTASK_LIGHTEN_AMOUNT) : baseColor;
+
+  var label = document.createElement("span");
+  label.className = "time-legend-label";
+  label.textContent = segment.label;
+  label.title = segment.label;
+
+  if (!isLive && state.editingSequenceEntryId === segment.key) {
+    item.classList.add("is-editing");
+
+    var durationMask = document.createElement("div");
+    durationMask.className = "duration-mask time-legend-duration";
+    var hoursInput = document.createElement("input");
+    hoursInput.type = "text";
+    hoursInput.inputMode = "numeric";
+    hoursInput.maxLength = 2;
+    hoursInput.setAttribute("aria-label", "Hours for " + segment.label);
+    var hoursUnit = document.createElement("span");
+    hoursUnit.className = "duration-mask-unit";
+    hoursUnit.textContent = "h";
+    var minutesInput = document.createElement("input");
+    minutesInput.type = "text";
+    minutesInput.inputMode = "numeric";
+    minutesInput.maxLength = 2;
+    minutesInput.setAttribute("aria-label", "Minutes for " + segment.label);
+    var minutesUnit = document.createElement("span");
+    minutesUnit.className = "duration-mask-unit";
+    minutesUnit.textContent = "m";
+    writeDurationMaskSeconds(hoursInput, minutesInput, segment.seconds);
+    bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
+    bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
+    durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
+
+    var saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.className = "time-legend-edit";
+    saveButton.textContent = "✓";
+    saveButton.setAttribute("aria-label", "Save time for " + segment.label);
+    saveButton.addEventListener("click", function () {
+      saveSequenceEntryEdit(segment.key, hoursInput, minutesInput, durationMask);
+    });
+
+    var cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "time-legend-delete";
+    cancelButton.textContent = "×";
+    cancelButton.setAttribute("aria-label", "Cancel editing " + segment.label);
+    cancelButton.addEventListener("click", function () {
+      state.editingSequenceEntryId = null;
+      renderTimeSequenceList(state.selectedDate);
+    });
+
+    item.append(swatch, label, durationMask, saveButton, cancelButton);
+    return item;
+  }
+
+  var timeText = document.createElement("span");
+  timeText.className = "time-legend-seconds";
+  timeText.textContent = formatHoursMinutes(segment.seconds);
+  item.append(swatch, label, timeText);
+
+  if (!isLive) {
+    var editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "time-legend-edit";
+    editButton.textContent = "✎";
+    editButton.setAttribute("aria-label", "Edit time for " + segment.label);
+    editButton.addEventListener("click", function () {
+      state.editingSequenceEntryId = segment.key;
+      renderTimeSequenceList(state.selectedDate);
+    });
+
+    var deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "time-legend-delete";
+    deleteButton.textContent = "×";
+    deleteButton.setAttribute("aria-label", "Delete time for " + segment.label);
+    deleteButton.addEventListener("click", function () {
+      deleteSequenceEntry(segment.key);
+    });
+
+    item.append(editButton, deleteButton);
+  }
+
+  return item;
+}
+
+function updateTimeEntrySeconds(dateKey, entryId, seconds) {
+  state.data.timeEntries[dateKey] = getDayTimeEntries(dateKey).map(function (entry) {
+    if (entry.id !== entryId) return entry;
+    var updated = Object.assign({}, entry, { seconds: seconds, endedAt: new Date().toISOString() });
+    return updated;
+  });
+}
+
+function removeTimeEntryById(dateKey, entryId) {
+  var entries = getDayTimeEntries(dateKey).filter(function (entry) { return entry.id !== entryId; });
+  if (entries.length) {
+    state.data.timeEntries[dateKey] = entries;
+  } else {
+    delete state.data.timeEntries[dateKey];
+  }
+}
+
+function saveSequenceEntryEdit(entryId, hoursInput, minutesInput, durationMask) {
+  var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
+  if (seconds <= 0) {
+    durationMask.classList.add("is-invalid");
+    return;
+  }
+  queueUndo("time entry edit");
+  updateTimeEntrySeconds(state.selectedDate, entryId, seconds);
+  state.editingSequenceEntryId = null;
+  saveData();
+  renderTimePie();
+}
+
+function deleteSequenceEntry(entryId) {
+  queueUndo("time entry removal");
+  removeTimeEntryById(state.selectedDate, entryId);
+  saveData();
+  renderTimePie();
+}
+
+function renderTimePie() {
+  var buckets = getDayTimeBuckets(state.selectedDate);
+  var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
+
+  if (state.timeChartMode === "sequence") {
+    renderTimeSequenceList(state.selectedDate);
+  } else {
+    renderPieSlices(buckets, total);
+  }
+
+  renderTimeLegend(buckets);
 }
 
 function setTimeChartMode(mode) {
   state.timeChartMode = mode;
-  state.pinnedChartSegmentKey = null;
+  state.editingSequenceEntryId = null;
+  els.timeChartArea.hidden = mode !== "merged";
+  els.timerControls.hidden = mode !== "merged";
+  els.timeSequenceList.hidden = mode !== "sequence";
   els.timeChartModeMergedButton.classList.toggle("is-active", mode === "merged");
   els.timeChartModeSequenceButton.classList.toggle("is-active", mode === "sequence");
   renderTimePie();

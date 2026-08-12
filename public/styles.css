@@ -2655,6 +2655,10 @@ textarea:focus {
   justify-content: center;
 }
 
+.time-chart-area[hidden] {
+  display: none;
+}
+
 .time-chart {
   position: relative;
   height: 100%;
@@ -2677,10 +2681,6 @@ textarea:focus {
 .time-slice {
   fill: none;
   stroke-width: 20;
-}
-
-.time-slice.is-pinnable {
-  cursor: pointer;
 }
 
 .time-chart-mode-toggle {
@@ -2778,6 +2778,41 @@ textarea:focus {
   background: rgba(255, 240, 238, 0.7);
 }
 
+.time-legend-edit {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(22, 51, 33, 0.4);
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.time-legend-edit:hover {
+  color: var(--green-meta);
+  background: rgba(var(--green-rgb), 0.1);
+}
+
+.time-legend-item.is-editing {
+  align-items: center;
+}
+
+.time-sequence-list {
+  display: grid;
+  gap: 8px;
+}
+
+.time-sequence-list[hidden] {
+  display: none;
+}
+
 .time-legend-add {
   display: flex;
   align-items: center;
@@ -2821,6 +2856,10 @@ textarea:focus {
   width: 100%;
   max-width: 280px;
   margin: 0 auto;
+}
+
+.timer-controls[hidden] {
+  display: none;
 }
 
 .time-view-toggle {

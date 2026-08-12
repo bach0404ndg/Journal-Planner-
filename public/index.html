@@ -80,12 +80,12 @@
                   <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
                 </div>
 
-                <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Pie chart arrangement">
-                  <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Merged</button>
+                <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Time Pie display">
+                  <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Pie</button>
                   <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">Sequence</button>
                 </div>
 
-                <div class="time-chart-area">
+                <div class="time-chart-area" id="timeChartArea">
                   <div class="time-chart">
                     <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
                       <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
@@ -97,7 +97,9 @@
                   </div>
                 </div>
 
-                <div class="timer-controls">
+                <div class="time-sequence-list" id="timeSequenceList" hidden></div>
+
+                <div class="timer-controls" id="timerControls">
                   <div class="range-switch time-view-toggle" role="tablist" aria-label="Time panel view">
                     <button class="range-button" type="button" id="timeViewLegendButton" role="tab">Legend</button>
                     <button class="range-button is-active" type="button" id="timeViewTimerButton" role="tab">Timer</button>
