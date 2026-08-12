@@ -110,8 +110,7 @@ const state = {
   draggingCalendarTask: null,
   undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
-  editingTimeBucket: null,
-  hoveredTimeBucketKey: null,
+  timePanelView: "timer",
   timer: {
     status: "idle",
     dateKey: "",
@@ -184,11 +183,13 @@ const els = {
   removeOldDataButton: document.querySelector("#removeOldDataButton"),
 
   clearTimeEntriesButton: document.querySelector("#clearTimeEntriesButton"),
-  timeChartHoverArea: document.querySelector("#timeChartHoverArea"),
   timePieChart: document.querySelector("#timePieChart"),
   timePieSlices: document.querySelector("#timePieSlices"),
   timeChartTotal: document.querySelector("#timeChartTotal"),
   timeLegend: document.querySelector("#timeLegend"),
+  timeViewLegendButton: document.querySelector("#timeViewLegendButton"),
+  timeViewTimerButton: document.querySelector("#timeViewTimerButton"),
+  timerRow: document.querySelector("#timerRow"),
   timerTaskSelect: document.querySelector("#timerTaskSelect"),
   timerDurationMask: document.querySelector("#timerDurationMask"),
   timerDurationHours: document.querySelector("#timerDurationHours"),
@@ -202,7 +203,6 @@ const els = {
   timerContinueButton: document.querySelector("#timerContinueButton"),
   timerEndButton: document.querySelector("#timerEndButton"),
   timerFinishedControls: document.querySelector("#timerFinishedControls"),
-  showBreakInChartCheckbox: document.querySelector("#showBreakInChartCheckbox"),
 };
 
 function loadData() {
@@ -901,17 +901,11 @@ function bindEvents() {
   bindDurationMaskInput(els.timerDurationMinutes, 59, function () {
     els.timerDurationMask.classList.remove("is-invalid");
   });
-  els.showBreakInChartCheckbox.addEventListener("change", renderTimePie);
-  els.timeChartHoverArea.addEventListener("mouseleave", function () {
-    if (!state.hoveredTimeBucketKey) return;
-    state.hoveredTimeBucketKey = null;
-    renderTimeLegend(state.lastTimeBuckets || []);
+  els.timeViewLegendButton.addEventListener("click", function () {
+    setTimePanelView("legend");
   });
-  els.timeChartHoverArea.addEventListener("focusout", function (event) {
-    if (!state.hoveredTimeBucketKey) return;
-    if (event.relatedTarget && els.timeChartHoverArea.contains(event.relatedTarget)) return;
-    state.hoveredTimeBucketKey = null;
-    renderTimeLegend(state.lastTimeBuckets || []);
+  els.timeViewTimerButton.addEventListener("click", function () {
+    setTimePanelView("timer");
   });
   window.addEventListener("beforeunload", (event) => {
     if (state.timer.status === "running" || state.timer.status === "paused") {
@@ -1681,6 +1675,7 @@ function renderAll() {
   ensureStarterSections();
   renderSpecialTasks();
   renderCalendar();
+  setTimePanelView(state.timePanelView);
   renderTimePie();
   renderGoals();
   renderJournal();
@@ -2681,7 +2676,6 @@ function startTimer() {
   }
   els.timerDurationMask.classList.remove("is-invalid");
   ensureAudioContext();
-  state.editingTimeBucket = null;
 
   var selection = els.timerTaskSelect.value;
   var parts = selection ? selection.split(":") : ["", ""];
@@ -2844,69 +2838,93 @@ function stopAlarm() {
 
 var PIE_RADIUS = 45;
 var PIE_CIRCUMFERENCE = 2 * Math.PI * PIE_RADIUS;
+var PIE_DIVIDER_LENGTH = PIE_CIRCUMFERENCE * 0.012;
+var SUBTASK_LIGHTEN_AMOUNT = 0.4;
+var DIRECT_TIME_KEY = "__direct__";
 
-function getDayTimeBuckets(dateKey, includeBreak) {
-  if (includeBreak === undefined) includeBreak = true;
+function lightenHexColor(hex, amount) {
+  var match = /^#([0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!match) return hex;
+  var num = parseInt(match[1], 16);
+  var r = (num >> 16) & 255;
+  var g = (num >> 8) & 255;
+  var b = num & 255;
+  r = Math.round(r + (255 - r) * amount);
+  g = Math.round(g + (255 - g) * amount);
+  b = Math.round(b + (255 - b) * amount);
+  return "rgb(" + r + ", " + g + ", " + b + ")";
+}
+
+function getDayTimeBuckets(dateKey) {
   var buckets = new Map();
 
-  function addSeconds(key, label, color, seconds) {
+  function addSeconds(taskKey, taskLabel, color, subtaskId, subtaskLabel, seconds) {
     if (seconds <= 0) return;
-    var bucket = buckets.get(key) || { key: key, label: label, color: color, seconds: 0 };
+    var bucket = buckets.get(taskKey);
+    if (!bucket) {
+      bucket = { key: taskKey, label: taskLabel, color: color, seconds: 0, subBuckets: new Map() };
+      buckets.set(taskKey, bucket);
+    }
     bucket.seconds += seconds;
-    buckets.set(key, bucket);
+    var subKey = subtaskId || DIRECT_TIME_KEY;
+    var sub = bucket.subBuckets.get(subKey);
+    if (!sub) {
+      sub = { key: subKey, label: subtaskLabel || "", seconds: 0 };
+      bucket.subBuckets.set(subKey, sub);
+    }
+    sub.seconds += seconds;
   }
 
   (state.data.timeEntries[dateKey] || []).forEach(function (entry) {
-    if (!includeBreak && !entry.taskId) return;
-    addSeconds(entry.taskId || "break", entry.taskText || "Untitled", entry.color, entry.seconds);
+    addSeconds(entry.taskId || "break", entry.taskText || "Untitled", entry.color, entry.subtaskId, entry.subtaskText, entry.seconds);
   });
 
-  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey && (includeBreak || state.timer.taskId)) {
-    addSeconds(state.timer.taskId || "break", state.timer.taskText || "Untitled", state.timer.color, liveElapsedSeconds());
+  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey) {
+    addSeconds(state.timer.taskId || "break", state.timer.taskText || "Untitled", state.timer.color, state.timer.subtaskId, state.timer.subtaskText, liveElapsedSeconds());
   }
 
   var result = [];
-  buckets.forEach(function (bucket) { result.push(bucket); });
+  buckets.forEach(function (bucket) {
+    var subResult = [];
+    bucket.subBuckets.forEach(function (sub) { subResult.push(sub); });
+    subResult.sort(function (a, b) {
+      if (a.key === DIRECT_TIME_KEY) return -1;
+      if (b.key === DIRECT_TIME_KEY) return 1;
+      return b.seconds - a.seconds;
+    });
+    bucket.subBuckets = subResult;
+    result.push(bucket);
+  });
   result.sort(function (a, b) { return b.seconds - a.seconds; });
   return result;
 }
 
 function renderTimePie() {
-  var includeBreak = els.showBreakInChartCheckbox.checked;
-  var buckets = getDayTimeBuckets(state.selectedDate, includeBreak);
+  var buckets = getDayTimeBuckets(state.selectedDate);
   var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
-  state.lastTimeBuckets = buckets;
-  if (state.hoveredTimeBucketKey && !buckets.some(function (b) { return b.key === state.hoveredTimeBucketKey; })) {
-    state.hoveredTimeBucketKey = null;
-  }
 
   els.timePieSlices.innerHTML = "";
   var offset = 0;
   buckets.forEach(function (bucket) {
-    var fraction = total > 0 ? bucket.seconds / total : 0;
-    var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    slice.setAttribute("class", "time-slice");
-    slice.setAttribute("cx", "60");
-    slice.setAttribute("cy", "60");
-    slice.setAttribute("r", String(PIE_RADIUS));
-    slice.setAttribute("transform", "rotate(-90 60 60)");
-    slice.setAttribute("stroke-dasharray", fraction * PIE_CIRCUMFERENCE + " " + PIE_CIRCUMFERENCE);
-    slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
-    slice.setAttribute("tabindex", "0");
-    slice.setAttribute("role", "button");
-    slice.setAttribute("aria-label", bucket.label + ", " + formatHoursMinutes(bucket.seconds));
-    var color = bucket.key === "break" ? breakTrackColor : getCalendarTaskColor(bucket.color);
-    slice.style.stroke = color.color;
-    var revealBucket = function () {
-      if (state.hoveredTimeBucketKey === bucket.key) return;
-      state.hoveredTimeBucketKey = bucket.key;
-      renderTimeLegend(state.lastTimeBuckets);
-    };
-    slice.addEventListener("pointerenter", revealBucket);
-    slice.addEventListener("focus", revealBucket);
-    slice.addEventListener("click", revealBucket);
-    els.timePieSlices.append(slice);
-    offset += fraction;
+    var baseColor = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
+    bucket.subBuckets.forEach(function (sub, index) {
+      var fraction = total > 0 ? sub.seconds / total : 0;
+      var isLastInBucket = index === bucket.subBuckets.length - 1;
+      var dashLength = fraction * PIE_CIRCUMFERENCE;
+      if (!isLastInBucket) dashLength = Math.max(0, dashLength - PIE_DIVIDER_LENGTH);
+
+      var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      slice.setAttribute("class", "time-slice");
+      slice.setAttribute("cx", "60");
+      slice.setAttribute("cy", "60");
+      slice.setAttribute("r", String(PIE_RADIUS));
+      slice.setAttribute("transform", "rotate(-90 60 60)");
+      slice.setAttribute("stroke-dasharray", dashLength + " " + PIE_CIRCUMFERENCE);
+      slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
+      slice.style.stroke = sub.key === DIRECT_TIME_KEY ? baseColor : lightenHexColor(baseColor, SUBTASK_LIGHTEN_AMOUNT);
+      els.timePieSlices.append(slice);
+      offset += fraction;
+    });
   });
 
   els.timeChartTotal.textContent = formatHoursMinutes(total);
@@ -2926,89 +2944,48 @@ function renderTimeLegend(buckets) {
   var liveBucketKey = state.timer.status !== "idle" && state.timer.dateKey === state.selectedDate
     ? (state.timer.taskId || "break")
     : null;
-  var editingKey = state.editingTimeBucket && state.editingTimeBucket.dateKey === state.selectedDate
-    ? state.editingTimeBucket.key
-    : null;
 
-  var activeBucket = null;
-  if (editingKey) {
-    activeBucket = buckets.find(function (b) { return b.key === editingKey; }) || null;
-  } else if (state.hoveredTimeBucketKey) {
-    activeBucket = buckets.find(function (b) { return b.key === state.hoveredTimeBucketKey; }) || null;
-  }
-
-  if (!activeBucket) {
-    if (buckets.length) {
-      var hint = document.createElement("span");
-      hint.className = "time-legend-hint";
-      hint.textContent = "Hover or tab a slice for details";
-      els.timeLegend.append(hint);
-    }
+  if (!buckets.length) {
+    var hint = document.createElement("span");
+    hint.className = "time-legend-hint";
+    hint.textContent = "No time tracked yet";
+    els.timeLegend.append(hint);
     return;
   }
 
+  buckets.forEach(function (bucket) {
+    els.timeLegend.append(makeTimeLegendRow(bucket, bucket.key === liveBucketKey));
+  });
+}
+
+function makeTimeLegendRow(bucket, isLive) {
   var item = document.createElement("div");
   item.className = "time-legend-item";
 
-  if (editingKey === activeBucket.key) {
-    item.classList.add("is-editing");
-    item.append(makeTimeBucketEditor(activeBucket));
-    els.timeLegend.append(item);
-    return;
-  }
-
   var swatch = document.createElement("span");
   swatch.className = "time-legend-swatch";
-  swatch.style.background = activeBucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(activeBucket.color).color;
+  swatch.style.background = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
   var label = document.createElement("span");
   label.className = "time-legend-label";
-  label.textContent = activeBucket.key === "break" ? timeBreakLabel : activeBucket.label;
+  label.textContent = bucket.key === "break" ? timeBreakLabel : bucket.label;
   label.title = label.textContent;
-  var seconds = document.createElement("span");
-  seconds.className = "time-legend-seconds";
-  seconds.textContent = formatHoursMinutes(activeBucket.seconds);
-  item.append(swatch, label, seconds);
+  item.append(swatch, label);
 
-  if (activeBucket.key !== liveBucketKey) {
-    var editButton = document.createElement("button");
-    editButton.type = "button";
-    editButton.className = "time-legend-edit";
-    editButton.textContent = "✎";
-    editButton.setAttribute("aria-label", "Edit tracked time for " + label.textContent);
-    editButton.addEventListener("click", function () {
-      state.editingTimeBucket = { dateKey: state.selectedDate, key: activeBucket.key };
-      renderTimeLegend(state.lastTimeBuckets);
-    });
-    item.append(editButton);
+  if (isLive) {
+    var seconds = document.createElement("span");
+    seconds.className = "time-legend-seconds";
+    seconds.textContent = formatHoursMinutes(bucket.seconds);
+    item.append(seconds);
+    return item;
   }
-
-  els.timeLegend.append(item);
-}
-
-function makeTimeBucketEditor(bucket) {
-  var wrap = document.createElement("div");
-  wrap.className = "time-legend-editor";
-
-  var taskSelect = document.createElement("select");
-  taskSelect.className = "time-legend-editor-task";
-  taskSelect.setAttribute("aria-label", "Reassign tracked time to task");
-  taskSelect.append(makeOption("", timeBreakLabel));
-  sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []).forEach(function (note) {
-    taskSelect.append(makeOption(note.id, note.text));
-  });
-  var currentValue = bucket.key === "break" ? "" : bucket.key;
-  if (currentValue && !taskSelect.querySelector("option[value=\"" + currentValue + "\"]")) {
-    taskSelect.prepend(makeOption(currentValue, bucket.label));
-  }
-  taskSelect.value = currentValue;
 
   var durationMask = document.createElement("div");
-  durationMask.className = "duration-mask";
+  durationMask.className = "duration-mask time-legend-duration";
   var hoursInput = document.createElement("input");
   hoursInput.type = "text";
   hoursInput.inputMode = "numeric";
   hoursInput.maxLength = 2;
-  hoursInput.setAttribute("aria-label", "Hours tracked for " + bucket.label);
+  hoursInput.setAttribute("aria-label", "Hours tracked for " + label.textContent);
   var hoursUnit = document.createElement("span");
   hoursUnit.className = "duration-mask-unit";
   hoursUnit.textContent = "h";
@@ -3016,50 +2993,30 @@ function makeTimeBucketEditor(bucket) {
   minutesInput.type = "text";
   minutesInput.inputMode = "numeric";
   minutesInput.maxLength = 2;
-  minutesInput.setAttribute("aria-label", "Minutes tracked for " + bucket.label);
+  minutesInput.setAttribute("aria-label", "Minutes tracked for " + label.textContent);
   var minutesUnit = document.createElement("span");
   minutesUnit.className = "duration-mask-unit";
   minutesUnit.textContent = "m";
   writeDurationMaskSeconds(hoursInput, minutesInput, bucket.seconds);
   bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
   bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
-  durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
-
-  var saveButton = document.createElement("button");
-  saveButton.type = "button";
-  saveButton.className = "ghost-button";
-  saveButton.textContent = "Save";
-  saveButton.addEventListener("click", function () {
-    saveTimeBucketEdit(bucket.key, taskSelect.value, hoursInput, minutesInput, durationMask);
+  durationMask.addEventListener("focusout", function (event) {
+    if (event.relatedTarget && durationMask.contains(event.relatedTarget)) return;
+    commitTimeBucketDuration(bucket, hoursInput, minutesInput, durationMask);
   });
+  durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
 
   var deleteButton = document.createElement("button");
   deleteButton.type = "button";
-  deleteButton.className = "ghost-button";
-  deleteButton.textContent = "Delete";
+  deleteButton.className = "time-legend-delete";
+  deleteButton.textContent = "×";
+  deleteButton.setAttribute("aria-label", "Delete tracked time for " + label.textContent);
   deleteButton.addEventListener("click", function () {
     deleteTimeBucket(bucket.key);
   });
 
-  var cancelButton = document.createElement("button");
-  cancelButton.type = "button";
-  cancelButton.className = "ghost-button";
-  cancelButton.textContent = "Cancel";
-  cancelButton.addEventListener("click", function () {
-    state.editingTimeBucket = null;
-    renderTimePie();
-  });
-
-  var fieldsRow = document.createElement("div");
-  fieldsRow.className = "time-legend-editor-row";
-  fieldsRow.append(taskSelect, durationMask);
-
-  var buttonsRow = document.createElement("div");
-  buttonsRow.className = "time-legend-editor-row";
-  buttonsRow.append(saveButton, deleteButton, cancelButton);
-
-  wrap.append(fieldsRow, buttonsRow);
-  return wrap;
+  item.append(durationMask, deleteButton);
+  return item;
 }
 
 function replaceTimeBucketEntries(dateKey, bucketKey, newEntry) {
@@ -3074,39 +3031,44 @@ function replaceTimeBucketEntries(dateKey, bucketKey, newEntry) {
   }
 }
 
-function saveTimeBucketEdit(bucketKey, newTaskId, hoursInput, minutesInput, durationMask) {
+function commitTimeBucketDuration(bucket, hoursInput, minutesInput, durationMask) {
   var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
   if (seconds <= 0) {
     durationMask.classList.add("is-invalid");
     return;
   }
-  var dateKey = state.selectedDate;
-  var note = newTaskId ? (state.data.calendarNotes[dateKey] || []).find(function (item) { return item.id === newTaskId; }) : null;
+  durationMask.classList.remove("is-invalid");
+  if (seconds === bucket.seconds) return;
 
   queueUndo("time entry edit");
-  replaceTimeBucketEntries(dateKey, bucketKey, {
+  replaceTimeBucketEntries(state.selectedDate, bucket.key, {
     id: makeId("time"),
-    taskId: newTaskId || "",
-    taskText: newTaskId ? (note ? note.text : "") : timeBreakLabel,
+    taskId: bucket.key === "break" ? "" : bucket.key,
+    taskText: bucket.key === "break" ? timeBreakLabel : bucket.label,
     seconds: seconds,
-    color: note ? note.color : "",
+    color: bucket.color,
     subtaskId: "",
     subtaskText: "",
     startedAt: "",
     endedAt: new Date().toISOString(),
   });
-  state.editingTimeBucket = null;
   saveData();
   renderTimePie();
 }
 
 function deleteTimeBucket(bucketKey) {
-  if (!window.confirm("Remove tracked time for this task today?")) return;
   queueUndo("time entry removal");
   replaceTimeBucketEntries(state.selectedDate, bucketKey, null);
-  state.editingTimeBucket = null;
   saveData();
   renderTimePie();
+}
+
+function setTimePanelView(view) {
+  state.timePanelView = view;
+  els.timeLegend.hidden = view !== "legend";
+  els.timerRow.hidden = view !== "timer";
+  els.timeViewLegendButton.classList.toggle("is-active", view === "legend");
+  els.timeViewTimerButton.classList.toggle("is-active", view === "timer");
 }
 
 /* Task selector */

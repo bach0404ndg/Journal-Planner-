@@ -80,23 +80,27 @@
                   <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
                 </div>
 
-                <div class="time-chart-hover-area" id="timeChartHoverArea">
-                  <div class="time-chart-area">
-                    <div class="time-chart">
-                      <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart. Hover or tab through a slice for details.">
-                        <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
-                        <g id="timePieSlices"></g>
-                      </svg>
-                      <div class="time-chart-center">
-                        <span class="time-chart-total" id="timeChartTotal">0h 0m</span>
-                      </div>
+                <div class="time-chart-area">
+                  <div class="time-chart">
+                    <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
+                      <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
+                      <g id="timePieSlices"></g>
+                    </svg>
+                    <div class="time-chart-center">
+                      <span class="time-chart-total" id="timeChartTotal">0h 0m</span>
                     </div>
                   </div>
-                  <div class="time-legend" id="timeLegend"></div>
                 </div>
 
                 <div class="timer-controls">
-                  <div class="timer-row">
+                  <div class="range-switch time-view-toggle" role="tablist" aria-label="Time panel view">
+                    <button class="range-button" type="button" id="timeViewLegendButton" role="tab">Legend</button>
+                    <button class="range-button is-active" type="button" id="timeViewTimerButton" role="tab">Timer</button>
+                  </div>
+
+                  <div class="time-legend" id="timeLegend" hidden></div>
+
+                  <div class="timer-row" id="timerRow">
                     <label>
                       <span>Track</span>
                       <select id="timerTaskSelect" aria-label="Task to track"></select>
@@ -125,10 +129,6 @@
                     <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
                     <button class="primary-button" type="button" id="timerEndButton">End</button>
                   </div>
-                  <label class="time-chart-toggle">
-                    <input type="checkbox" id="showBreakInChartCheckbox" checked>
-                    <span>Show breaks in chart</span>
-                  </label>
                 </div>
               </section>
             </div>
