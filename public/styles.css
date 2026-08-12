@@ -2648,7 +2648,7 @@ textarea:focus {
 }
 
 .time-chart-area {
-  flex: 1 1 210px;
+  flex: 1 1 260px;
   min-height: 100px;
   display: flex;
   align-items: center;
@@ -2662,7 +2662,7 @@ textarea:focus {
 .time-chart {
   position: relative;
   width: 100%;
-  max-width: 200px;
+  max-width: 100%;
   aspect-ratio: 1;
 }
 
@@ -2697,7 +2697,7 @@ textarea:focus {
 .time-chart-total {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 900;
 }
 
