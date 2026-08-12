@@ -2617,7 +2617,6 @@ textarea:focus {
   border: 1px solid rgba(22, 51, 33, 0.14);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.52);
-  align-self: start;
 }
 
 .time-panel select,
@@ -2649,7 +2648,7 @@ textarea:focus {
 }
 
 .time-chart-area {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 148px;
   display: flex;
   align-items: center;
@@ -2809,6 +2808,8 @@ textarea:focus {
 .time-sequence-list {
   display: grid;
   gap: 8px;
+  flex: 1 1 auto;
+  align-content: start;
 }
 
 .time-sequence-list[hidden] {
