@@ -2612,7 +2612,7 @@ textarea:focus {
 .time-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding: 14px;
   border: 1px solid rgba(22, 51, 33, 0.14);
   border-radius: var(--radius);
@@ -2884,12 +2884,10 @@ textarea:focus {
 
 .timer-controls {
   display: grid;
-  gap: 6px;
+  gap: 0;
   width: 100%;
   max-width: 260px;
-  margin: 24px auto 0;
-  padding-top: 18px;
-  border-top: 1px solid rgba(22, 51, 33, 0.1);
+  margin: 0 auto;
 }
 
 .timer-controls[hidden] {
@@ -2899,6 +2897,9 @@ textarea:focus {
 .timer-session {
   display: grid;
   gap: 6px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(22, 51, 33, 0.1);
 }
 
 .timer-session[hidden] {
