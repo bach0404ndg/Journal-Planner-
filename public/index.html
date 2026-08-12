@@ -82,7 +82,7 @@
 
                 <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Time Pie display">
                   <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Pie</button>
-                  <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">Sequence</button>
+                  <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">History</button>
                 </div>
 
                 <div class="time-chart-area" id="timeChartArea">
@@ -100,12 +100,7 @@
                 <div class="time-sequence-list" id="timeSequenceList" hidden></div>
 
                 <div class="timer-controls" id="timerControls">
-                  <div class="range-switch time-view-toggle" role="tablist" aria-label="Time panel view">
-                    <button class="range-button" type="button" id="timeViewLegendButton" role="tab">Legend</button>
-                    <button class="range-button is-active" type="button" id="timeViewTimerButton" role="tab">Timer</button>
-                  </div>
-
-                  <div class="time-legend" id="timeLegend" hidden></div>
+                  <div class="time-legend" id="timeLegend"></div>
 
                   <div class="time-legend-add" id="timeLegendAdd" hidden>
                     <select id="legendAddTaskSelect" aria-label="Task to add tracked time for"></select>
@@ -149,6 +144,11 @@
                       <span>Time is up!</span>
                       <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
                       <button class="primary-button" type="button" id="timerEndButton">End</button>
+                    </div>
+                    <div class="timer-stop-confirm" id="timerStopConfirm" hidden>
+                      <span>Save tracked time?</span>
+                      <button class="primary-button" type="button" id="timerStopSaveButton">Save</button>
+                      <button class="ghost-button" type="button" id="timerStopDiscardButton">Discard</button>
                     </div>
                   </div>
                 </div>

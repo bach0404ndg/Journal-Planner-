@@ -2612,8 +2612,8 @@ textarea:focus {
 .time-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 14px;
   border: 1px solid rgba(22, 51, 33, 0.14);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.52);
@@ -2648,8 +2648,8 @@ textarea:focus {
 }
 
 .time-chart-area {
-  flex: 1 1 auto;
-  min-height: 160px;
+  flex: 0 0 auto;
+  min-height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2670,6 +2670,7 @@ textarea:focus {
 .time-chart svg {
   display: block;
   width: 100%;
+  max-width: 130px;
   height: auto;
 }
 
@@ -2698,13 +2699,13 @@ textarea:focus {
 .time-chart-total {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 1.3rem;
+  font-size: 1rem;
   font-weight: 900;
 }
 
 .time-legend {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .time-legend[hidden] {
@@ -2828,6 +2829,39 @@ textarea:focus {
   min-width: 0;
 }
 
+.time-legend-inline-add {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px dashed rgba(var(--green-rgb), 0.32);
+  border-radius: 999px;
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.3);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.time-legend-inline-add:hover {
+  border-color: var(--green);
+  background: rgba(var(--green-rgb), 0.1);
+}
+
+.time-legend-add-wrapper {
+  justify-content: flex-start;
+  padding-top: 2px;
+}
+
+.time-legend-add-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 36px;
+  font-size: 0.82rem;
+}
+
 .time-legend-add-button {
   display: grid;
   place-items: center;
@@ -2852,7 +2886,7 @@ textarea:focus {
 
 .timer-controls {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   max-width: 280px;
   margin: 0 auto;
@@ -2860,10 +2894,6 @@ textarea:focus {
 
 .timer-controls[hidden] {
   display: none;
-}
-
-.time-view-toggle {
-  justify-self: center;
 }
 
 .timer-session {
@@ -3007,6 +3037,30 @@ textarea:focus {
 
 .timer-finished[hidden] {
   display: none;
+}
+
+.timer-stop-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timer-stop-confirm[hidden] {
+  display: none;
+}
+
+.timer-stop-confirm span {
+  color: var(--green-meta);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.timer-stop-confirm button {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 0.88rem;
 }
 
 .timer-buttons button,
