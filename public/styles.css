@@ -2648,7 +2648,7 @@ textarea:focus {
 }
 
 .time-chart-area {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 148px;
   display: flex;
   align-items: center;
@@ -2661,17 +2661,15 @@ textarea:focus {
 
 .time-chart {
   position: relative;
-  height: 100%;
-  width: auto;
+  width: 100%;
+  max-width: 200px;
   aspect-ratio: 1;
-  max-width: 100%;
 }
 
 .time-chart svg {
   display: block;
   width: 100%;
-  max-width: 170px;
-  height: auto;
+  height: 100%;
 }
 
 .time-chart-track {
@@ -2699,7 +2697,7 @@ textarea:focus {
 .time-chart-total {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   font-weight: 900;
 }
 
@@ -2808,8 +2806,6 @@ textarea:focus {
 .time-sequence-list {
   display: grid;
   gap: 8px;
-  flex: 1 1 auto;
-  align-content: start;
 }
 
 .time-sequence-list[hidden] {
@@ -2891,7 +2887,7 @@ textarea:focus {
   gap: 6px;
   width: 100%;
   max-width: 260px;
-  margin: 0 auto;
+  margin: 24px auto 0;
   padding-top: 18px;
   border-top: 1px solid rgba(22, 51, 33, 0.1);
 }
@@ -2918,6 +2914,10 @@ textarea:focus {
 .timer-row label {
   gap: 3px;
   font-size: 0.78rem;
+}
+
+.timer-row label span {
+  display: none;
 }
 
 .duration-mask {
