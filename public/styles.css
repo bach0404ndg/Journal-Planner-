@@ -2648,7 +2648,7 @@ textarea:focus {
 }
 
 .time-chart-area {
-  flex: 0 1 auto;
+  flex: 0 1 210px;
   min-height: 100px;
   display: flex;
   align-items: center;
@@ -2806,6 +2806,9 @@ textarea:focus {
 .time-sequence-list {
   display: grid;
   gap: 8px;
+  flex: 0 1 auto;
+  min-height: 60px;
+  align-content: start;
 }
 
 .time-sequence-list[hidden] {
