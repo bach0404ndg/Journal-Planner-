@@ -2590,7 +2590,7 @@ textarea:focus {
 
 .side-panel-split {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(270px, 1fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -2612,8 +2612,8 @@ textarea:focus {
 .time-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 12px;
+  padding: 16px;
   border: 1px solid rgba(22, 51, 33, 0.14);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.52);
@@ -2621,9 +2621,9 @@ textarea:focus {
 
 .time-panel select,
 .time-panel input[type="text"] {
-  min-height: 32px;
-  padding: 0 8px;
-  font-size: 0.78rem;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 0.92rem;
 }
 
 .time-panel-head {
@@ -2636,15 +2636,15 @@ textarea:focus {
 .time-panel-title {
   margin: 0;
   color: var(--green-meta);
-  font-size: 0.78rem;
+  font-size: 1rem;
   font-weight: 850;
   letter-spacing: 0.02em;
 }
 
 .time-clear-button {
-  min-height: 26px;
-  padding: 0 10px;
-  font-size: 0.7rem;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.8rem;
 }
 
 .time-chart-hover-area {
@@ -2657,7 +2657,7 @@ textarea:focus {
 
 .time-chart-area {
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2679,12 +2679,12 @@ textarea:focus {
 
 .time-chart-track {
   stroke: rgba(22, 51, 33, 0.16);
-  stroke-width: 16;
+  stroke-width: 20;
 }
 
 .time-slice {
   fill: none;
-  stroke-width: 16;
+  stroke-width: 20;
   cursor: pointer;
 }
 
@@ -2704,16 +2704,16 @@ textarea:focus {
 .time-chart-total {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 0.8rem;
+  font-size: 1.3rem;
   font-weight: 900;
 }
 
 .time-legend {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
-  max-width: 220px;
-  min-height: 24px;
+  max-width: 280px;
+  min-height: 30px;
   margin: 0 auto;
   flex: 0 0 auto;
 }
@@ -2721,9 +2721,9 @@ textarea:focus {
 .time-legend-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 650;
   color: rgba(22, 51, 33, 0.82);
 }
@@ -2732,14 +2732,14 @@ textarea:focus {
   display: block;
   text-align: center;
   color: rgba(22, 51, 33, 0.4);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 650;
 }
 
 .time-legend-swatch {
   flex: 0 0 auto;
-  width: 10px;
-  height: 10px;
+  width: 13px;
+  height: 13px;
   border-radius: 999px;
 }
 
@@ -2754,7 +2754,7 @@ textarea:focus {
 .time-legend-seconds {
   flex: 0 0 auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: var(--green-meta);
 }
@@ -2763,15 +2763,15 @@ textarea:focus {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 16px;
-  min-width: 16px;
-  min-height: 16px;
+  width: 22px;
+  min-width: 22px;
+  min-height: 22px;
   padding: 0;
   border: 0;
   border-radius: 999px;
   color: rgba(22, 51, 33, 0.4);
   background: transparent;
-  font-size: 0.62rem;
+  font-size: 0.78rem;
 }
 
 .time-legend-edit:hover {
@@ -2785,8 +2785,8 @@ textarea:focus {
 
 .time-legend-editor {
   display: grid;
-  gap: 6px;
-  padding: 6px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid rgba(var(--green-rgb), 0.24);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.6);
@@ -2794,7 +2794,7 @@ textarea:focus {
 
 .time-legend-editor-row {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -2808,37 +2808,37 @@ textarea:focus {
 }
 
 .time-legend-editor-row .ghost-button {
-  min-height: 26px;
-  padding: 0 9px;
-  font-size: 0.68rem;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.8rem;
 }
 
 .timer-controls {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  max-width: 220px;
+  max-width: 280px;
   margin: 0 auto;
 }
 
 .timer-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
+  gap: 8px;
 }
 
 .timer-row label {
-  gap: 4px;
-  font-size: 0.7rem;
+  gap: 5px;
+  font-size: 0.85rem;
 }
 
 .duration-mask {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: 32px;
-  padding: 0 6px;
+  gap: 3px;
+  min-height: 40px;
+  padding: 0 10px;
   border: 1px solid rgba(22, 51, 33, 0.2);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.46);
@@ -2850,7 +2850,7 @@ textarea:focus {
 }
 
 .time-panel .duration-mask input[type="text"] {
-  width: 1.5em;
+  width: 1.7em;
   min-width: 0;
   min-height: auto;
   padding: 0;
@@ -2858,7 +2858,7 @@ textarea:focus {
   background: transparent;
   text-align: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   font-weight: 800;
   color: var(--ink);
 }
@@ -2869,12 +2869,12 @@ textarea:focus {
 
 .duration-mask-unit {
   color: rgba(22, 51, 33, 0.55);
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   font-weight: 800;
 }
 
 .timer-display {
-  padding: 6px;
+  padding: 10px;
   border: 1px solid rgba(22, 51, 33, 0.12);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.4);
@@ -2884,7 +2884,7 @@ textarea:focus {
 .timer-display #timerTimeText {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 1.5rem;
+  font-size: 2.3rem;
   font-weight: 900;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
@@ -2913,7 +2913,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -2923,29 +2923,29 @@ textarea:focus {
 
 .timer-buttons button,
 .timer-finished button {
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 0.72rem;
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 0.88rem;
 }
 
 .timer-finished {
   color: #9c3328;
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 800;
 }
 
 .time-chart-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   color: rgba(22, 51, 33, 0.72);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
 .time-chart-toggle input {
-  width: 14px;
-  min-height: 14px;
+  width: 16px;
+  min-height: 16px;
   margin: 0;
   padding: 0;
   accent-color: var(--green);
