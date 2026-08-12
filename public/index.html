@@ -34,42 +34,44 @@
       <section class="view is-active" id="calendarView" aria-label="Calendar">
         <div class="calendar-layout">
           <aside class="side-panel" aria-label="Calendar task editor">
-            <div class="calendar-date-controls" aria-label="Calendar date controls">
-              <label>
-                <span>Date</span>
-                <div class="picker-input-row">
-                  <input id="selectedDateInput" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
-                  <button class="picker-open-button" id="selectedDatePickerButton" type="button" aria-label="Open calendar date picker">▦</button>
-                  <input class="native-picker-input" id="selectedDatePicker" type="date" tabindex="-1" aria-hidden="true">
-                </div>
-              </label>
-              <label>
-                <span>Month</span>
-                <select id="monthSelect"></select>
-              </label>
-              <label>
-                <span>Year</span>
-                <input id="yearInput" type="number" min="1970" max="2099" inputmode="numeric">
-              </label>
-              <button class="ghost-button" type="button" id="todayButton">Today</button>
-              <button class="cleanup-button" type="button" id="calendarRemoveOldDataButton">Remove old data</button>
-            </div>
-            <div class="emoji-section" aria-label="Day emoji markers">
-              <div class="emoji-palette" id="emojiPalette"></div>
-            </div>
             <div class="side-panel-split">
-              <div class="side-panel-tasks">
-                <form id="calendarNoteForm" class="stacked-form">
-                  <div class="special-task-shelf" aria-label="Special calendar tasks">
-                    <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
-                    <div class="special-task-list" id="specialTaskList"></div>
-                  </div>
+              <div class="side-panel-main">
+                <div class="calendar-date-controls" aria-label="Calendar date controls">
                   <label>
-                    <span>Task</span>
-                    <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+                    <span>Date</span>
+                    <div class="picker-input-row">
+                      <input id="selectedDateInput" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
+                      <button class="picker-open-button" id="selectedDatePickerButton" type="button" aria-label="Open calendar date picker">▦</button>
+                      <input class="native-picker-input" id="selectedDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                    </div>
                   </label>
-                </form>
-                <div class="mini-list" id="selectedDateNotes"></div>
+                  <label>
+                    <span>Month</span>
+                    <select id="monthSelect"></select>
+                  </label>
+                  <label>
+                    <span>Year</span>
+                    <input id="yearInput" type="number" min="1970" max="2099" inputmode="numeric">
+                  </label>
+                  <button class="ghost-button" type="button" id="todayButton">Today</button>
+                  <button class="cleanup-button" type="button" id="calendarRemoveOldDataButton">Remove old data</button>
+                </div>
+                <div class="emoji-section" aria-label="Day emoji markers">
+                  <div class="emoji-palette" id="emojiPalette"></div>
+                </div>
+                <div class="side-panel-tasks">
+                  <form id="calendarNoteForm" class="stacked-form">
+                    <div class="special-task-shelf" aria-label="Special calendar tasks">
+                      <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
+                      <div class="special-task-list" id="specialTaskList"></div>
+                    </div>
+                    <label>
+                      <span>Task</span>
+                      <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+                    </label>
+                  </form>
+                  <div class="mini-list" id="selectedDateNotes"></div>
+                </div>
               </div>
 
               <section class="time-panel" aria-label="Time tracking">

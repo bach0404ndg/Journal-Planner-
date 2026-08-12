@@ -2590,20 +2590,19 @@ textarea:focus {
 
 .side-panel-split {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(190px, 220px);
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
   gap: 16px;
   align-items: start;
-  margin-top: 16px;
+}
+
+.side-panel-main {
+  min-width: 0;
 }
 
 .side-panel-tasks {
   display: grid;
   gap: 10px;
   min-width: 0;
-}
-
-.side-panel-split .stacked-form {
-  margin-top: 0;
 }
 
 .side-panel-tasks .mini-list {
@@ -2687,6 +2686,9 @@ textarea:focus {
 .time-legend {
   display: grid;
   gap: 4px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
 }
 
 .time-legend[hidden] {
@@ -2784,6 +2786,9 @@ textarea:focus {
 .timer-controls {
   display: grid;
   gap: 8px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
 }
 
 .timer-controls .is-invalid {
