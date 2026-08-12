@@ -58,16 +58,19 @@
               <div class="emoji-palette" id="emojiPalette"></div>
             </div>
             <div class="side-panel-split">
-              <form id="calendarNoteForm" class="stacked-form">
-                <div class="special-task-shelf" aria-label="Special calendar tasks">
-                  <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
-                  <div class="special-task-list" id="specialTaskList"></div>
-                </div>
-                <label>
-                  <span>Task</span>
-                  <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
-                </label>
-              </form>
+              <div class="side-panel-tasks">
+                <form id="calendarNoteForm" class="stacked-form">
+                  <div class="special-task-shelf" aria-label="Special calendar tasks">
+                    <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
+                    <div class="special-task-list" id="specialTaskList"></div>
+                  </div>
+                  <label>
+                    <span>Task</span>
+                    <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+                  </label>
+                </form>
+                <div class="mini-list" id="selectedDateNotes"></div>
+              </div>
 
               <section class="time-panel" aria-label="Time tracking">
                 <div class="time-panel-head">
@@ -87,14 +90,16 @@
                 <div class="time-legend" id="timeLegend" hidden></div>
 
                 <div class="timer-controls">
-                  <label>
-                    <span>Track</span>
-                    <select id="timerTaskSelect" aria-label="Task to track"></select>
-                  </label>
-                  <label>
-                    <span>Duration</span>
-                    <input id="timerDurationInput" type="text" placeholder="25m" value="25m">
-                  </label>
+                  <div class="timer-row">
+                    <label>
+                      <span>Track</span>
+                      <select id="timerTaskSelect" aria-label="Task to track"></select>
+                    </label>
+                    <label class="timer-duration-field">
+                      <span>Duration</span>
+                      <input id="timerDurationInput" type="text" placeholder="25m" value="25m">
+                    </label>
+                  </div>
                   <div class="timer-display" id="timerDisplay">
                     <span id="timerTimeText" aria-hidden="true">00:00</span>
                     <span class="sr-only" id="timerStatusText" aria-live="polite">Timer idle</span>
@@ -116,7 +121,6 @@
                 </div>
               </section>
             </div>
-            <div class="mini-list" id="selectedDateNotes"></div>
           </aside>
 
           <section class="calendar-panel" aria-label="Monthly calendar">

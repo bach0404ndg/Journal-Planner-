@@ -2590,23 +2590,40 @@ textarea:focus {
 
 .side-panel-split {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 220px);
   gap: 16px;
   align-items: start;
   margin-top: 16px;
+}
+
+.side-panel-tasks {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
 }
 
 .side-panel-split .stacked-form {
   margin-top: 0;
 }
 
+.side-panel-tasks .mini-list {
+  margin-top: 0;
+}
+
 .time-panel {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid rgba(22, 51, 33, 0.14);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.52);
+}
+
+.time-panel select,
+.time-panel input[type="text"] {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 0.78rem;
 }
 
 .time-panel-head {
@@ -2632,7 +2649,7 @@ textarea:focus {
 
 .time-chart {
   position: relative;
-  width: min(220px, 100%);
+  width: min(128px, 100%);
   margin: 0 auto;
 }
 
@@ -2644,12 +2661,12 @@ textarea:focus {
 
 .time-chart-track {
   stroke: rgba(22, 51, 33, 0.16);
-  stroke-width: 18;
+  stroke-width: 16;
 }
 
 .time-slice {
   fill: none;
-  stroke-width: 18;
+  stroke-width: 16;
 }
 
 .time-chart-center {
@@ -2663,13 +2680,17 @@ textarea:focus {
 .time-chart-total {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 1.02rem;
+  font-size: 0.8rem;
   font-weight: 900;
 }
 
 .time-legend {
   display: grid;
   gap: 4px;
+}
+
+.time-legend[hidden] {
+  display: none;
 }
 
 .time-legend-item {
@@ -2707,7 +2728,7 @@ textarea:focus {
 
 .timer-controls {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .timer-controls .is-invalid {
@@ -2715,8 +2736,24 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(156, 51, 40, 0.12);
 }
 
+.timer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: 6px;
+}
+
+.timer-row label {
+  gap: 4px;
+  font-size: 0.7rem;
+}
+
+.timer-duration-field input {
+  padding: 0 4px;
+  text-align: center;
+}
+
 .timer-display {
-  padding: 10px 8px;
+  padding: 6px;
   border: 1px solid rgba(22, 51, 33, 0.12);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.4);
@@ -2726,9 +2763,9 @@ textarea:focus {
 .timer-display #timerTimeText {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: 2.1rem;
+  font-size: 1.5rem;
   font-weight: 900;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2755,26 +2792,41 @@ textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+}
+
+.timer-finished[hidden] {
+  display: none;
+}
+
+.timer-buttons button,
+.timer-finished button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.72rem;
 }
 
 .timer-finished {
   color: #9c3328;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
 .time-chart-toggle {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   color: rgba(22, 51, 33, 0.72);
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
 .time-chart-toggle input {
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
   accent-color: var(--green);
 }
 
@@ -2886,7 +2938,7 @@ textarea:focus {
   }
 
   .time-chart {
-    width: min(180px, 100%);
+    width: min(150px, 100%);
   }
 
   .timer-buttons,
