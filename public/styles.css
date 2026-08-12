@@ -2617,6 +2617,7 @@ textarea:focus {
   border: 1px solid rgba(22, 51, 33, 0.14);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.52);
+  align-self: start;
 }
 
 .time-panel select,
@@ -2889,10 +2890,9 @@ textarea:focus {
   gap: 6px;
   width: 100%;
   max-width: 260px;
-  margin-top: auto;
-  margin-left: auto;
-  margin-right: auto;
-  padding-top: 14px;
+  margin: 0 auto;
+  padding-top: 18px;
+  border-top: 1px solid rgba(22, 51, 33, 0.1);
 }
 
 .timer-controls[hidden] {
