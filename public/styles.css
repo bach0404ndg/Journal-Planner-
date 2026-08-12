@@ -2647,6 +2647,14 @@ textarea:focus {
   font-size: 0.7rem;
 }
 
+.time-chart-hover-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .time-chart-area {
   flex: 1 1 auto;
   min-height: 120px;
@@ -2677,6 +2685,12 @@ textarea:focus {
 .time-slice {
   fill: none;
   stroke-width: 16;
+  cursor: pointer;
+}
+
+.time-slice:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
 }
 
 .time-chart-center {
@@ -2699,11 +2713,9 @@ textarea:focus {
   gap: 4px;
   width: 100%;
   max-width: 220px;
+  min-height: 24px;
   margin: 0 auto;
-}
-
-.time-legend[hidden] {
-  display: none;
+  flex: 0 0 auto;
 }
 
 .time-legend-item {
@@ -2714,6 +2726,14 @@ textarea:focus {
   font-size: 0.72rem;
   font-weight: 650;
   color: rgba(22, 51, 33, 0.82);
+}
+
+.time-legend-hint {
+  display: block;
+  text-align: center;
+  color: rgba(22, 51, 33, 0.4);
+  font-size: 0.68rem;
+  font-weight: 650;
 }
 
 .time-legend-swatch {
