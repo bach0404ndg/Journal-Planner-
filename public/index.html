@@ -80,6 +80,11 @@
                   <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
                 </div>
 
+                <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Pie chart arrangement">
+                  <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Merged</button>
+                  <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">Sequence</button>
+                </div>
+
                 <div class="time-chart-area">
                   <div class="time-chart">
                     <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
@@ -100,34 +105,49 @@
 
                   <div class="time-legend" id="timeLegend" hidden></div>
 
-                  <div class="timer-row" id="timerRow">
-                    <label>
-                      <span>Track</span>
-                      <select id="timerTaskSelect" aria-label="Task to track"></select>
-                    </label>
-                    <label class="timer-duration-field">
-                      <span>Duration</span>
-                      <div class="duration-mask" id="timerDurationMask">
-                        <input id="timerDurationHours" type="text" inputmode="numeric" maxlength="2" value="00" aria-label="Hours">
-                        <span class="duration-mask-unit">h</span>
-                        <input id="timerDurationMinutes" type="text" inputmode="numeric" maxlength="2" value="25" aria-label="Minutes">
-                        <span class="duration-mask-unit">m</span>
+                  <div class="time-legend-add" id="timeLegendAdd" hidden>
+                    <select id="legendAddTaskSelect" aria-label="Task to add tracked time for"></select>
+                    <div class="duration-mask time-legend-duration" id="legendAddDurationMask">
+                      <input id="legendAddDurationHours" type="text" inputmode="numeric" maxlength="2" value="00" aria-label="Hours to add">
+                      <span class="duration-mask-unit">h</span>
+                      <input id="legendAddDurationMinutes" type="text" inputmode="numeric" maxlength="2" value="00" aria-label="Minutes to add">
+                      <span class="duration-mask-unit">m</span>
+                    </div>
+                    <button class="time-legend-add-button" type="button" id="legendAddButton" aria-label="Add tracked time">+</button>
+                  </div>
+
+                  <div class="timer-session" id="timerSession">
+                    <div class="timer-row">
+                      <label>
+                        <span>Track</span>
+                        <select id="timerTaskSelect" aria-label="Task to track"></select>
+                      </label>
+                      <label class="timer-duration-field">
+                        <span>Duration</span>
+                        <div class="duration-mask" id="timerDurationMask">
+                          <input id="timerDurationMinutes" type="text" inputmode="numeric" maxlength="2" value="25" aria-label="Minutes">
+                          <span class="duration-mask-unit">m</span>
+                        </div>
+                      </label>
+                    </div>
+                    <div class="timer-display-row">
+                      <button class="timer-adjust-button" type="button" id="timerSubtractButton" aria-label="Subtract 5 minutes" hidden>−</button>
+                      <div class="timer-display" id="timerDisplay">
+                        <span id="timerTimeText" aria-hidden="true">00:00</span>
+                        <span class="sr-only" id="timerStatusText" aria-live="polite">Timer idle</span>
                       </div>
-                    </label>
-                  </div>
-                  <div class="timer-display" id="timerDisplay">
-                    <span id="timerTimeText" aria-hidden="true">00:00</span>
-                    <span class="sr-only" id="timerStatusText" aria-live="polite">Timer idle</span>
-                  </div>
-                  <div class="timer-buttons">
-                    <button class="primary-button" type="button" id="timerStartButton">Start</button>
-                    <button class="ghost-button" type="button" id="timerPauseButton" hidden>Pause</button>
-                    <button class="ghost-button" type="button" id="timerStopButton" hidden>Stop</button>
-                  </div>
-                  <div class="timer-finished" id="timerFinishedControls" hidden>
-                    <span>Time is up!</span>
-                    <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
-                    <button class="primary-button" type="button" id="timerEndButton">End</button>
+                      <button class="timer-adjust-button" type="button" id="timerAddButton" aria-label="Add 5 minutes" hidden>+</button>
+                    </div>
+                    <div class="timer-buttons">
+                      <button class="primary-button" type="button" id="timerStartButton">Start</button>
+                      <button class="ghost-button" type="button" id="timerPauseButton" hidden>Pause</button>
+                      <button class="ghost-button" type="button" id="timerStopButton" hidden>Stop</button>
+                    </div>
+                    <div class="timer-finished" id="timerFinishedControls" hidden>
+                      <span>Time is up!</span>
+                      <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
+                      <button class="primary-button" type="button" id="timerEndButton">End</button>
+                    </div>
                   </div>
                 </div>
               </section>

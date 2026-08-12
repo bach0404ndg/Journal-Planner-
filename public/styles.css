@@ -2679,6 +2679,14 @@ textarea:focus {
   stroke-width: 20;
 }
 
+.time-slice.is-pinnable {
+  cursor: pointer;
+}
+
+.time-chart-mode-toggle {
+  align-self: center;
+}
+
 .time-chart-center {
   position: absolute;
   inset: 0;
@@ -2770,6 +2778,43 @@ textarea:focus {
   background: rgba(255, 240, 238, 0.7);
 }
 
+.time-legend-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-legend-add[hidden] {
+  display: none;
+}
+
+.time-legend-add select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.time-legend-add-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  color: white;
+  background: var(--green);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.time-legend-add-button:hover {
+  border-color: var(--green-dark);
+  background: var(--green-active);
+}
+
 .timer-controls {
   display: grid;
   gap: 10px;
@@ -2782,14 +2827,19 @@ textarea:focus {
   justify-self: center;
 }
 
+.timer-session {
+  display: grid;
+  gap: 10px;
+}
+
+.timer-session[hidden] {
+  display: none;
+}
+
 .timer-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-}
-
-.timer-row[hidden] {
-  display: none;
 }
 
 .timer-row label {
@@ -2838,7 +2888,41 @@ textarea:focus {
   font-weight: 800;
 }
 
+.timer-display-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timer-adjust-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid rgba(22, 51, 33, 0.2);
+  border-radius: 999px;
+  color: var(--green-meta);
+  background: rgba(255, 255, 255, 0.46);
+  font-size: 1.1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.timer-adjust-button:hover {
+  border-color: var(--green-dark);
+  background: rgba(var(--green-rgb), 0.14);
+}
+
+.timer-adjust-button[hidden] {
+  display: none;
+}
+
 .timer-display {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 10px;
   border: 1px solid rgba(22, 51, 33, 0.12);
   border-radius: var(--radius);

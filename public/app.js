@@ -111,6 +111,8 @@ const state = {
   undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
   timePanelView: "timer",
+  timeChartMode: "merged",
+  pinnedChartSegmentKey: null,
   timer: {
     status: "idle",
     dateKey: "",
@@ -186,14 +188,23 @@ const els = {
   timePieChart: document.querySelector("#timePieChart"),
   timePieSlices: document.querySelector("#timePieSlices"),
   timeChartTotal: document.querySelector("#timeChartTotal"),
+  timeChartModeMergedButton: document.querySelector("#timeChartModeMergedButton"),
+  timeChartModeSequenceButton: document.querySelector("#timeChartModeSequenceButton"),
   timeLegend: document.querySelector("#timeLegend"),
+  timeLegendAdd: document.querySelector("#timeLegendAdd"),
+  legendAddTaskSelect: document.querySelector("#legendAddTaskSelect"),
+  legendAddDurationMask: document.querySelector("#legendAddDurationMask"),
+  legendAddDurationHours: document.querySelector("#legendAddDurationHours"),
+  legendAddDurationMinutes: document.querySelector("#legendAddDurationMinutes"),
+  legendAddButton: document.querySelector("#legendAddButton"),
   timeViewLegendButton: document.querySelector("#timeViewLegendButton"),
   timeViewTimerButton: document.querySelector("#timeViewTimerButton"),
-  timerRow: document.querySelector("#timerRow"),
+  timerSession: document.querySelector("#timerSession"),
   timerTaskSelect: document.querySelector("#timerTaskSelect"),
   timerDurationMask: document.querySelector("#timerDurationMask"),
-  timerDurationHours: document.querySelector("#timerDurationHours"),
   timerDurationMinutes: document.querySelector("#timerDurationMinutes"),
+  timerSubtractButton: document.querySelector("#timerSubtractButton"),
+  timerAddButton: document.querySelector("#timerAddButton"),
   timerDisplay: document.querySelector("#timerDisplay"),
   timerTimeText: document.querySelector("#timerTimeText"),
   timerStatusText: document.querySelector("#timerStatusText"),
@@ -895,18 +906,35 @@ function bindEvents() {
   els.timerContinueButton.addEventListener("click", continueTimer);
   els.timerEndButton.addEventListener("click", function () { stopTimer(true); });
   els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
-  bindDurationMaskInput(els.timerDurationHours, 99, function () {
+  bindDurationMaskInput(els.timerDurationMinutes, 99, function () {
     els.timerDurationMask.classList.remove("is-invalid");
   });
-  bindDurationMaskInput(els.timerDurationMinutes, 59, function () {
-    els.timerDurationMask.classList.remove("is-invalid");
-  });
+  els.timerSubtractButton.addEventListener("click", function () { adjustTimerDuration(-5 * 60); });
+  els.timerAddButton.addEventListener("click", function () { adjustTimerDuration(5 * 60); });
   els.timeViewLegendButton.addEventListener("click", function () {
     setTimePanelView("legend");
   });
   els.timeViewTimerButton.addEventListener("click", function () {
     setTimePanelView("timer");
   });
+  els.timeChartModeMergedButton.addEventListener("click", function () {
+    setTimeChartMode("merged");
+  });
+  els.timeChartModeSequenceButton.addEventListener("click", function () {
+    setTimeChartMode("sequence");
+  });
+  els.timePieChart.addEventListener("click", function () {
+    if (!state.pinnedChartSegmentKey) return;
+    state.pinnedChartSegmentKey = null;
+    updateChartCenterDisplay();
+  });
+  bindDurationMaskInput(els.legendAddDurationHours, 99, function () {
+    els.legendAddDurationMask.classList.remove("is-invalid");
+  });
+  bindDurationMaskInput(els.legendAddDurationMinutes, 59, function () {
+    els.legendAddDurationMask.classList.remove("is-invalid");
+  });
+  els.legendAddButton.addEventListener("click", addManualTimeEntry);
   window.addEventListener("beforeunload", (event) => {
     if (state.timer.status === "running" || state.timer.status === "paused") {
       event.preventDefault();
@@ -1676,6 +1704,8 @@ function renderAll() {
   renderSpecialTasks();
   renderCalendar();
   setTimePanelView(state.timePanelView);
+  els.timeChartModeMergedButton.classList.toggle("is-active", state.timeChartMode === "merged");
+  els.timeChartModeSequenceButton.classList.toggle("is-active", state.timeChartMode === "sequence");
   renderTimePie();
   renderGoals();
   renderJournal();
@@ -2631,6 +2661,14 @@ function bindDurationMaskInput(input, max, onChange) {
   });
 }
 
+function readMinutesInputSeconds(minutesInput) {
+  return Math.max(0, parseInt(minutesInput.value, 10) || 0) * 60;
+}
+
+function writeMinutesInputSeconds(minutesInput, totalSeconds) {
+  minutesInput.value = String(Math.max(0, Math.round(totalSeconds / 60))).padStart(2, "0");
+}
+
 function formatCountdown(totalSeconds) {
   var total = Math.max(0, Math.floor(totalSeconds));
   var hours = Math.floor(total / 3600);
@@ -2669,7 +2707,7 @@ function stopTick() {
 
 function startTimer() {
   if (state.timer.status === "running") return;
-  var seconds = readDurationMaskSeconds(els.timerDurationHours, els.timerDurationMinutes);
+  var seconds = readMinutesInputSeconds(els.timerDurationMinutes);
   if (seconds <= 0) {
     els.timerDurationMask.classList.add("is-invalid");
     return;
@@ -2742,7 +2780,7 @@ function finishTimer() {
 }
 
 function continueTimer() {
-  var extra = readDurationMaskSeconds(els.timerDurationHours, els.timerDurationMinutes) || defaultTimerMinutes * 60;
+  var extra = readMinutesInputSeconds(els.timerDurationMinutes) || defaultTimerMinutes * 60;
   state.timer.durationSeconds += extra;
   state.timer.status = "running";
   state.timer.sessionStartEpoch = Date.now();
@@ -2752,6 +2790,13 @@ function continueTimer() {
   renderTimerControls();
   renderTimerDisplay();
   renderTimePie();
+}
+
+function adjustTimerDuration(deltaSeconds) {
+  if (state.timer.status !== "running" && state.timer.status !== "paused") return;
+  var elapsed = liveElapsedSeconds();
+  state.timer.durationSeconds = Math.max(elapsed, state.timer.durationSeconds + deltaSeconds);
+  renderTimerDisplay();
 }
 
 function stopTimer(save) {
@@ -2899,44 +2944,133 @@ function getDayTimeBuckets(dateKey) {
   return result;
 }
 
+function getMergedTimeSegments(buckets) {
+  var segments = [];
+  buckets.forEach(function (bucket) {
+    bucket.subBuckets.forEach(function (sub) {
+      segments.push({
+        key: bucket.key + ":" + sub.key,
+        taskKey: bucket.key,
+        label: sub.key === DIRECT_TIME_KEY || bucket.key === "break" ? bucket.label : bucket.label + " — " + sub.label,
+        color: bucket.color,
+        seconds: sub.seconds,
+        isSubtask: sub.key !== DIRECT_TIME_KEY,
+      });
+    });
+  });
+  return segments;
+}
+
+function getSequentialTimeSegments(dateKey) {
+  var entries = getDayTimeEntries(dateKey).slice();
+  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey) {
+    entries.push({
+      id: "__live__",
+      taskId: state.timer.taskId,
+      taskText: state.timer.taskText,
+      color: state.timer.color,
+      subtaskId: state.timer.subtaskId,
+      subtaskText: state.timer.subtaskText,
+      seconds: liveElapsedSeconds(),
+    });
+  }
+  return entries.filter(function (entry) { return entry.seconds > 0; }).map(function (entry) {
+    var taskKey = entry.taskId || "break";
+    var label = entry.taskId ? entry.taskText : timeBreakLabel;
+    if (entry.subtaskId && entry.subtaskText) label += " — " + entry.subtaskText;
+    return {
+      key: entry.id,
+      taskKey: taskKey,
+      label: label,
+      color: entry.color,
+      seconds: entry.seconds,
+      isSubtask: !!entry.subtaskId,
+    };
+  });
+}
+
 function renderTimePie() {
   var buckets = getDayTimeBuckets(state.selectedDate);
   var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
+  var segments = state.timeChartMode === "sequence"
+    ? getSequentialTimeSegments(state.selectedDate)
+    : getMergedTimeSegments(buckets);
+
+  state.lastChartSegments = segments;
+  state.lastChartTotalSeconds = total;
+  if (state.pinnedChartSegmentKey && !segments.some(function (s) { return s.key === state.pinnedChartSegmentKey; })) {
+    state.pinnedChartSegmentKey = null;
+  }
 
   els.timePieSlices.innerHTML = "";
   var offset = 0;
-  buckets.forEach(function (bucket) {
-    var baseColor = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
-    bucket.subBuckets.forEach(function (sub, index) {
-      var fraction = total > 0 ? sub.seconds / total : 0;
-      var isLastInBucket = index === bucket.subBuckets.length - 1;
-      var dashLength = fraction * PIE_CIRCUMFERENCE;
-      if (!isLastInBucket) dashLength = Math.max(0, dashLength - PIE_DIVIDER_LENGTH);
+  segments.forEach(function (segment, index) {
+    var fraction = total > 0 ? segment.seconds / total : 0;
+    var nextSegment = segments[index + 1];
+    var needsDivider = nextSegment && nextSegment.taskKey === segment.taskKey;
+    var dashLength = fraction * PIE_CIRCUMFERENCE;
+    if (needsDivider) dashLength = Math.max(0, dashLength - PIE_DIVIDER_LENGTH);
 
-      var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      slice.setAttribute("class", "time-slice");
-      slice.setAttribute("cx", "60");
-      slice.setAttribute("cy", "60");
-      slice.setAttribute("r", String(PIE_RADIUS));
-      slice.setAttribute("transform", "rotate(-90 60 60)");
-      slice.setAttribute("stroke-dasharray", dashLength + " " + PIE_CIRCUMFERENCE);
-      slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
-      slice.style.stroke = sub.key === DIRECT_TIME_KEY ? baseColor : lightenHexColor(baseColor, SUBTASK_LIGHTEN_AMOUNT);
-      els.timePieSlices.append(slice);
-      offset += fraction;
+    var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    slice.setAttribute("class", "time-slice");
+    slice.setAttribute("cx", "60");
+    slice.setAttribute("cy", "60");
+    slice.setAttribute("r", String(PIE_RADIUS));
+    slice.setAttribute("transform", "rotate(-90 60 60)");
+    slice.setAttribute("stroke-dasharray", dashLength + " " + PIE_CIRCUMFERENCE);
+    slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
+    var baseColor = segment.taskKey === "break" ? breakTrackColor.color : getCalendarTaskColor(segment.color).color;
+    slice.style.stroke = segment.isSubtask ? lightenHexColor(baseColor, SUBTASK_LIGHTEN_AMOUNT) : baseColor;
+
+    slice.addEventListener("pointerenter", function () {
+      els.timeChartTotal.textContent = formatHoursMinutes(segment.seconds);
     });
+    slice.addEventListener("pointerleave", function () {
+      updateChartCenterDisplay();
+    });
+    if (state.timeChartMode === "sequence") {
+      slice.classList.add("is-pinnable");
+      slice.addEventListener("click", function (event) {
+        event.stopPropagation();
+        state.pinnedChartSegmentKey = state.pinnedChartSegmentKey === segment.key ? null : segment.key;
+        updateChartCenterDisplay();
+      });
+    }
+
+    els.timePieSlices.append(slice);
+    offset += fraction;
   });
 
-  els.timeChartTotal.textContent = formatHoursMinutes(total);
+  updateChartCenterDisplay();
   if (total > 0) {
-    var labelText = buckets.map(function (b) {
-      return b.label + " " + formatHoursMinutes(b.seconds);
+    var labelText = segments.map(function (s) {
+      return s.label + " " + formatHoursMinutes(s.seconds);
     }).join(", ");
     els.timePieChart.setAttribute("aria-label", "Tracked time: " + labelText);
   } else {
     els.timePieChart.setAttribute("aria-label", "No time tracked");
   }
   renderTimeLegend(buckets);
+}
+
+function updateChartCenterDisplay() {
+  var pinnedKey = state.timeChartMode === "sequence" ? state.pinnedChartSegmentKey : null;
+  if (pinnedKey) {
+    var segment = (state.lastChartSegments || []).find(function (s) { return s.key === pinnedKey; });
+    if (segment) {
+      els.timeChartTotal.textContent = formatHoursMinutes(segment.seconds);
+      return;
+    }
+  }
+  els.timeChartTotal.textContent = formatHoursMinutes(state.lastChartTotalSeconds || 0);
+}
+
+function setTimeChartMode(mode) {
+  state.timeChartMode = mode;
+  state.pinnedChartSegmentKey = null;
+  els.timeChartModeMergedButton.classList.toggle("is-active", mode === "merged");
+  els.timeChartModeSequenceButton.classList.toggle("is-active", mode === "sequence");
+  renderTimePie();
 }
 
 function renderTimeLegend(buckets) {
@@ -3066,25 +3200,68 @@ function deleteTimeBucket(bucketKey) {
 function setTimePanelView(view) {
   state.timePanelView = view;
   els.timeLegend.hidden = view !== "legend";
-  els.timerRow.hidden = view !== "timer";
+  els.timeLegendAdd.hidden = view !== "legend";
+  els.timerSession.hidden = view !== "timer";
   els.timeViewLegendButton.classList.toggle("is-active", view === "legend");
   els.timeViewTimerButton.classList.toggle("is-active", view === "timer");
 }
 
+function renderLegendAddTaskSelect() {
+  var previousValue = els.legendAddTaskSelect.value;
+  els.legendAddTaskSelect.innerHTML = "";
+  populateTaskSelectOptions(els.legendAddTaskSelect);
+  if (previousValue && els.legendAddTaskSelect.querySelector("option[value=\"" + previousValue + "\"]")) {
+    els.legendAddTaskSelect.value = previousValue;
+  }
+}
+
+function addManualTimeEntry() {
+  var seconds = readDurationMaskSeconds(els.legendAddDurationHours, els.legendAddDurationMinutes);
+  if (seconds <= 0) {
+    els.legendAddDurationMask.classList.add("is-invalid");
+    return;
+  }
+  els.legendAddDurationMask.classList.remove("is-invalid");
+
+  var selection = els.legendAddTaskSelect.value;
+  var parts = selection ? selection.split(":") : ["", ""];
+  var taskId = parts[0];
+  var subtaskId = parts[1] || "";
+  var note = taskId ? (state.data.calendarNotes[state.selectedDate] || []).find(function (item) { return item.id === taskId; }) : null;
+  var subtask = subtaskId && note ? (note.subtasks || []).find(function (item) { return item.id === subtaskId; }) : null;
+
+  addTimeEntry(state.selectedDate, {
+    id: makeId("time"),
+    taskId: taskId,
+    taskText: taskId ? (note ? note.text : "") : timeBreakLabel,
+    seconds: seconds,
+    color: note ? note.color : "",
+    subtaskId: subtaskId,
+    subtaskText: subtask ? subtask.text : "",
+    startedAt: "",
+    endedAt: new Date().toISOString(),
+  });
+
+  writeDurationMaskSeconds(els.legendAddDurationHours, els.legendAddDurationMinutes, 0);
+}
+
 /* Task selector */
+
+function populateTaskSelectOptions(selectEl) {
+  selectEl.append(makeOption("", timeBreakLabel));
+  sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []).forEach(function (note) {
+    selectEl.append(makeOption(note.id, note.text));
+    (note.subtasks || []).forEach(function (subtask) {
+      selectEl.append(makeOption(note.id + ":" + subtask.id, "— " + subtask.text));
+    });
+  });
+}
 
 function renderTimerTaskSelect() {
   var isActive = state.timer.status !== "idle";
   var previousValue = isActive ? "" : els.timerTaskSelect.value;
   els.timerTaskSelect.innerHTML = "";
-  els.timerTaskSelect.append(makeOption("", timeBreakLabel));
-
-  sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []).forEach(function (note) {
-    els.timerTaskSelect.append(makeOption(note.id, note.text));
-    (note.subtasks || []).forEach(function (subtask) {
-      els.timerTaskSelect.append(makeOption(note.id + ":" + subtask.id, "— " + subtask.text));
-    });
-  });
+  populateTaskSelectOptions(els.timerTaskSelect);
 
   if (isActive) {
     var activeValue = state.timer.taskId
@@ -3121,6 +3298,8 @@ function renderTimerControls() {
   els.timerPauseButton.hidden = status !== "running";
   els.timerStopButton.hidden = status === "idle" || status === "finished";
   els.timerFinishedControls.hidden = status !== "finished";
+  els.timerSubtractButton.hidden = status !== "running" && status !== "paused";
+  els.timerAddButton.hidden = status !== "running" && status !== "paused";
   els.clearTimeEntriesButton.hidden = !getDayTimeEntries(state.selectedDate).length;
   renderTimerTaskSelect();
 }
@@ -3140,6 +3319,7 @@ function renderSelectedDateNotes() {
   });
 
   renderTimerTaskSelect();
+  renderLegendAddTaskSelect();
   renderTimePie();
 }
 
