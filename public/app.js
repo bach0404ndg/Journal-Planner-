@@ -60,6 +60,10 @@ const calendarTaskColors = [
   { id: "lilac", name: "Lilac", color: "#a985e8", tint: "rgba(226, 211, 255, 0.4)" },
 ];
 
+const timeBreakLabel = "Break";
+const breakTrackColor = { color: "rgba(22, 51, 33, 0.38)", tint: "rgba(22, 51, 33, 0.08)" };
+const defaultTimerMinutes = 25;
+
 const goalPaperColors = [
   { id: "", name: "Paper", color: "rgba(22, 51, 33, 0.24)", tint: "rgba(255, 255, 255, 0.28)" },
   { id: "green", name: "Green", color: "#08742b", tint: "rgba(8, 116, 43, 0.16)" },
@@ -106,6 +110,21 @@ const state = {
   draggingCalendarTask: null,
   undoSnapshot: null,
   journalFilters: { date: "", month: "", year: "", label: "" },
+  timer: {
+    status: "idle",
+    dateKey: "",
+    taskId: "",
+    subtaskId: "",
+    taskText: "",
+    color: "",
+    durationSeconds: 0,
+    accumulatedSeconds: 0,
+    sessionStartEpoch: null,
+    sessionStartedAt: null,
+    tickHandle: null,
+    audioContext: null,
+    lastDisplayedSecond: -1,
+  },
   data: loadData(),
 };
 
@@ -161,6 +180,24 @@ const els = {
   journalFilterLabel: document.querySelector("#journalFilterLabel"),
   resetJournalFiltersButton: document.querySelector("#resetJournalFiltersButton"),
   removeOldDataButton: document.querySelector("#removeOldDataButton"),
+
+  clearTimeEntriesButton: document.querySelector("#clearTimeEntriesButton"),
+  timePieChart: document.querySelector("#timePieChart"),
+  timePieSlices: document.querySelector("#timePieSlices"),
+  timeChartTotal: document.querySelector("#timeChartTotal"),
+  timeLegend: document.querySelector("#timeLegend"),
+  timerTaskSelect: document.querySelector("#timerTaskSelect"),
+  timerDurationInput: document.querySelector("#timerDurationInput"),
+  timerDisplay: document.querySelector("#timerDisplay"),
+  timerTimeText: document.querySelector("#timerTimeText"),
+  timerStatusText: document.querySelector("#timerStatusText"),
+  timerStartButton: document.querySelector("#timerStartButton"),
+  timerPauseButton: document.querySelector("#timerPauseButton"),
+  timerStopButton: document.querySelector("#timerStopButton"),
+  timerContinueButton: document.querySelector("#timerContinueButton"),
+  timerEndButton: document.querySelector("#timerEndButton"),
+  timerFinishedControls: document.querySelector("#timerFinishedControls"),
+  showBreakInChartCheckbox: document.querySelector("#showBreakInChartCheckbox"),
 };
 
 function loadData() {
@@ -169,9 +206,13 @@ function loadData() {
     if (saved && typeof saved === "object") {
       const goalSections = normalizeGoalSections(saved.goalSections);
       const goalGroups = normalizeGoalGroups(saved.goalGroups, goalSections);
+      const savedCalendarTasks = normalizeSavedCalendarTasks(saved.savedCalendarTasks);
       return {
         calendarNotes: normalizeCalendarNotes(saved.calendarNotes),
-        savedCalendarTasks: normalizeSavedCalendarTasks(saved.savedCalendarTasks),
+        savedCalendarTasks,
+        trackedSpecialTaskIds: normalizeTrackedSpecialTaskIds(saved.trackedSpecialTaskIds, savedCalendarTasks),
+        hiddenAllSpecialTaskCounterIds: normalizeTrackedSpecialTaskIds(saved.hiddenAllSpecialTaskCounterIds, savedCalendarTasks),
+        showAllSpecialTaskCounters: Boolean(saved.showAllSpecialTaskCounters),
         dayEmojis: saved.dayEmojis || {},
         goalSections,
         goalGroups,
@@ -181,6 +222,7 @@ function loadData() {
         palette: normalizePalette(saved.palette),
         journalEntryCollapsed: Boolean(saved.journalEntryCollapsed),
         journalLogWidth: normalizeJournalLogWidth(saved.journalLogWidth),
+        timeEntries: normalizeTimeEntries(saved.timeEntries),
       };
     }
   } catch (error) {
@@ -190,6 +232,9 @@ function loadData() {
   return {
     calendarNotes: {},
     savedCalendarTasks: [],
+    trackedSpecialTaskIds: [],
+    hiddenAllSpecialTaskCounterIds: [],
+    showAllSpecialTaskCounters: false,
     dayEmojis: {},
     goalSections: [],
     goalGroups: [{ id: makeId("goal-group"), title: defaultGoalGroupName, sections: [] }],
@@ -199,6 +244,7 @@ function loadData() {
     palette: "green",
     journalEntryCollapsed: false,
     journalLogWidth: 58,
+    timeEntries: {},
   };
 }
 
@@ -333,6 +379,17 @@ function normalizeSavedCalendarTasks(savedTasks) {
     });
 }
 
+function normalizeTrackedSpecialTaskIds(savedIds, savedTasks = []) {
+  if (!Array.isArray(savedIds)) return [];
+  const validIds = new Set(savedTasks.map((task) => task.id));
+  const seen = new Set();
+  return savedIds.filter((id) => {
+    if (!validIds.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 function normalizeGoalSectionColor(colorId) {
   return goalPaperColors.some((color) => color.id === colorId) ? colorId : "";
 }
@@ -377,6 +434,34 @@ function normalizeSubtasks(subtasks) {
     text: subtask.text || "",
     done: Boolean(subtask.done),
   }));
+}
+
+function normalizeTimeEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const seconds = Math.max(0, Math.floor(Number(entry.seconds) || 0));
+  if (!Number.isFinite(seconds)) return null;
+  return {
+    id: entry.id || makeId("time"),
+    taskId: String(entry.taskId || ""),
+    taskText: String(entry.taskText || "").trim(),
+    seconds,
+    color: normalizeCalendarTaskColor(entry.color),
+    subtaskId: String(entry.subtaskId || ""),
+    subtaskText: String(entry.subtaskText || "").trim(),
+    startedAt: String(entry.startedAt || ""),
+    endedAt: String(entry.endedAt || ""),
+  };
+}
+
+function normalizeTimeEntries(savedTimeEntries) {
+  if (!savedTimeEntries || typeof savedTimeEntries !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(savedTimeEntries)
+      .map(function ([dateKey, entries]) {
+        return [dateKey, Array.isArray(entries) ? entries.map(normalizeTimeEntry).filter(Boolean) : []];
+      })
+      .filter(function ([, entries]) { return entries.length; }),
+  );
 }
 
 function readableDate(dateKey) {
@@ -485,11 +570,11 @@ function compareTimeValues(a = "", b = "") {
 }
 
 function compareEntryDateTime(a, b) {
-  const dateCompare = (a.date || "").localeCompare(b.date || "");
+  const dateCompare = (b.date || "").localeCompare(a.date || "");
   if (dateCompare) return dateCompare;
-  const timeCompare = compareTimeValues(a.time, b.time);
+  const timeCompare = compareTimeValues(b.time, a.time);
   if (timeCompare) return timeCompare;
-  return (a.createdAt || "").localeCompare(b.createdAt || "");
+  return (b.createdAt || "").localeCompare(a.createdAt || "");
 }
 
 function sortedJournalEntries(entries) {
@@ -796,6 +881,24 @@ function bindEvents() {
 
   els.addSpecialTaskButton.addEventListener("click", () => {
     addSpecialTask();
+  });
+
+  /* Timer event bindings */
+  els.timerStartButton.addEventListener("click", startTimer);
+  els.timerPauseButton.addEventListener("click", pauseTimer);
+  els.timerStopButton.addEventListener("click", function () { stopTimer(true); });
+  els.timerContinueButton.addEventListener("click", continueTimer);
+  els.timerEndButton.addEventListener("click", function () { stopTimer(true); });
+  els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
+  els.timerDurationInput.addEventListener("input", function () {
+    els.timerDurationInput.classList.remove("is-invalid");
+  });
+  els.showBreakInChartCheckbox.addEventListener("change", renderTimePie);
+  window.addEventListener("beforeunload", (event) => {
+    if (state.timer.status === "running" || state.timer.status === "paused") {
+      event.preventDefault();
+      event.returnValue = "";
+    }
   });
 
   els.journalForm.addEventListener("submit", (event) => {
@@ -1276,8 +1379,20 @@ function removeSpecialTask(taskId) {
 
   queueUndo("special task removal");
   state.data.savedCalendarTasks = state.data.savedCalendarTasks.filter((item) => item.id !== taskId);
+  state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(
+    state.data.trackedSpecialTaskIds,
+    state.data.savedCalendarTasks,
+  );
+  state.data.hiddenAllSpecialTaskCounterIds = normalizeTrackedSpecialTaskIds(
+    state.data.hiddenAllSpecialTaskCounterIds,
+    state.data.savedCalendarTasks,
+  );
+  if (!state.data.savedCalendarTasks.length) {
+    state.data.showAllSpecialTaskCounters = false;
+  }
   saveData();
   renderSpecialTasks();
+  renderCalendar();
 }
 
 function applyJournalLayout() {
@@ -1547,6 +1662,7 @@ function renderAll() {
   ensureStarterSections();
   renderSpecialTasks();
   renderCalendar();
+  renderTimePie();
   renderGoals();
   renderJournal();
 }
@@ -1562,7 +1678,7 @@ function removeOldData() {
   if (!cutoffDate || !/^\d{4}-\d{2}-\d{2}$/.test(cutoffDate)) return;
 
   const confirmed = window.confirm(
-    `Remove journal entries, calendar tasks, day markers, and dated goals before ${cutoffDate}? You can undo this once.`,
+    "Remove journal entries, calendar tasks, day markers, time tracking, and dated goals before " + cutoffDate + "? You can undo this once.",
   );
   if (!confirmed) return;
 
@@ -1570,6 +1686,7 @@ function removeOldData() {
   const before = {
     calendarDays: Object.keys(state.data.calendarNotes).length,
     markerDays: Object.keys(state.data.dayEmojis).length,
+    timeDays: Object.keys(state.data.timeEntries).length,
     journalEntries: state.data.journalEntries.length,
     datedGoals: getAllGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
   };
@@ -1586,6 +1703,12 @@ function removeOldData() {
     }
   });
 
+  Object.keys(state.data.timeEntries).forEach((dateKey) => {
+    if (isDateKeyBefore(dateKey, cutoffDate)) {
+      delete state.data.timeEntries[dateKey];
+    }
+  });
+
   state.data.journalEntries = state.data.journalEntries.filter((entry) => !entry.date || !isDateKeyBefore(entry.date, cutoffDate));
   getAllGoalSections().forEach((section) => {
     section.goals = section.goals.filter((goal) => !goal.dueDate || !isDateKeyBefore(goal.dueDate, cutoffDate));
@@ -1594,6 +1717,7 @@ function removeOldData() {
   const after = {
     calendarDays: Object.keys(state.data.calendarNotes).length,
     markerDays: Object.keys(state.data.dayEmojis).length,
+    timeDays: Object.keys(state.data.timeEntries).length,
     journalEntries: state.data.journalEntries.length,
     datedGoals: getAllGoalSections().reduce((count, section) => count + section.goals.filter((goal) => goal.dueDate).length, 0),
   };
@@ -1606,11 +1730,13 @@ function removeOldData() {
     after.calendarDays +
     before.markerDays -
     after.markerDays +
+    before.timeDays -
+    after.timeDays +
     before.journalEntries -
     after.journalEntries +
     before.datedGoals -
     after.datedGoals;
-  window.alert(`Removed ${removed} old saved item${removed === 1 ? "" : "s"}.`);
+  window.alert("Removed " + removed + " old saved item" + (removed === 1 ? "" : "s") + ".");
 }
 
 function renderCalendar() {
@@ -1681,6 +1807,14 @@ function renderCalendar() {
 
 function renderSpecialTaskTracker(gridStart, totalDays) {
   els.specialTaskTracker.innerHTML = "";
+  state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(
+    state.data.trackedSpecialTaskIds,
+    state.data.savedCalendarTasks,
+  );
+  state.data.hiddenAllSpecialTaskCounterIds = normalizeTrackedSpecialTaskIds(
+    state.data.hiddenAllSpecialTaskCounterIds,
+    state.data.savedCalendarTasks,
+  );
 
   const counts = new Map();
   const trackerStart = gridStart;
@@ -1706,9 +1840,17 @@ function renderSpecialTaskTracker(gridStart, totalDays) {
     });
   }
 
-  state.data.savedCalendarTasks.forEach((task) => {
+  els.specialTaskTracker.append(makeSpecialTaskCounterAddMenu());
+
+  const hiddenAllIds = new Set(state.data.hiddenAllSpecialTaskCounterIds);
+  const trackerTasks = state.data.showAllSpecialTaskCounters
+    ? state.data.savedCalendarTasks.filter((task) => (counts.get(task.id) || 0) > 0 && !hiddenAllIds.has(task.id))
+    : state.data.trackedSpecialTaskIds
+        .map((taskId) => state.data.savedCalendarTasks.find((item) => item.id === taskId))
+        .filter(Boolean);
+
+  trackerTasks.forEach((task) => {
     const count = counts.get(task.id) || 0;
-    if (!count) return;
 
     const color = getCalendarTaskColor(task.color);
     const item = document.createElement("span");
@@ -1722,9 +1864,112 @@ function renderSpecialTaskTracker(gridStart, totalDays) {
     number.className = "special-task-count-number";
     number.textContent = `: ${count}`;
     item.title = `${count} completed in ${state.range === "week" ? "this week" : monthNames[state.month]}`;
-    item.append(label, number);
+    const removeButton = document.createElement("button");
+    removeButton.className = "special-task-count-remove";
+    removeButton.type = "button";
+    removeButton.textContent = "x";
+    removeButton.setAttribute("aria-label", `Hide ${task.text} counter`);
+    removeButton.addEventListener("click", () => {
+      removeSpecialTaskCounter(task.id);
+    });
+    item.append(label, number, removeButton);
     els.specialTaskTracker.append(item);
   });
+}
+
+function makeSpecialTaskCounterAddMenu() {
+  const menu = document.createElement("details");
+  menu.className = "special-task-counter-add-menu";
+
+  const summary = document.createElement("summary");
+  summary.textContent = "+";
+  summary.setAttribute("aria-label", "Add special task counter");
+  summary.title = "Add counter";
+
+  const items = document.createElement("div");
+  items.className = "special-task-counter-add-items";
+  const trackedIds = new Set(state.data.showAllSpecialTaskCounters
+    ? state.data.savedCalendarTasks
+        .map((task) => task.id)
+        .filter((id) => !state.data.hiddenAllSpecialTaskCounterIds.includes(id))
+    : state.data.trackedSpecialTaskIds);
+  const availableTasks = state.data.savedCalendarTasks.filter((task) => !trackedIds.has(task.id));
+
+  if (state.data.savedCalendarTasks.length) {
+    const allButton = document.createElement("button");
+    allButton.className = "special-task-counter-all";
+    allButton.type = "button";
+    allButton.textContent = "All";
+    allButton.addEventListener("click", () => {
+      menu.open = false;
+      addAllSpecialTaskCounters();
+    });
+    items.append(allButton);
+  }
+
+  if (!availableTasks.length) {
+    const empty = document.createElement("span");
+    empty.className = "special-task-counter-empty";
+    empty.textContent = state.data.savedCalendarTasks.length ? "All shown" : "No tasks";
+    items.append(empty);
+  } else {
+    availableTasks.forEach((task) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = task.text;
+      button.addEventListener("click", () => {
+        menu.open = false;
+        addSpecialTaskCounter(task.id);
+      });
+      items.append(button);
+    });
+  }
+
+  menu.append(summary, items);
+  return menu;
+}
+
+function addSpecialTaskCounter(taskId) {
+  if (!state.data.savedCalendarTasks.some((task) => task.id === taskId)) return;
+  if (!state.data.showAllSpecialTaskCounters && state.data.trackedSpecialTaskIds.includes(taskId)) return;
+  queueUndo("special task counter");
+  state.data.showAllSpecialTaskCounters = false;
+  state.data.hiddenAllSpecialTaskCounterIds = [];
+  state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(
+    [...state.data.trackedSpecialTaskIds, taskId],
+    state.data.savedCalendarTasks,
+  );
+  saveData();
+  const { gridStart, totalDays } = getCalendarGridRange();
+  renderSpecialTaskTracker(gridStart, totalDays);
+}
+
+function addAllSpecialTaskCounters() {
+  const allIds = state.data.savedCalendarTasks.map((task) => task.id);
+  if (state.data.showAllSpecialTaskCounters && allIds.length && !state.data.hiddenAllSpecialTaskCounterIds.length) return;
+  queueUndo("all special task counters");
+  state.data.showAllSpecialTaskCounters = true;
+  state.data.hiddenAllSpecialTaskCounterIds = [];
+  state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(allIds, state.data.savedCalendarTasks);
+  saveData();
+  const { gridStart, totalDays } = getCalendarGridRange();
+  renderSpecialTaskTracker(gridStart, totalDays);
+}
+
+function removeSpecialTaskCounter(taskId) {
+  if (!state.data.showAllSpecialTaskCounters && !state.data.trackedSpecialTaskIds.includes(taskId)) return;
+  queueUndo("special task counter removal");
+  if (state.data.showAllSpecialTaskCounters) {
+    state.data.hiddenAllSpecialTaskCounterIds = normalizeTrackedSpecialTaskIds(
+      [...state.data.hiddenAllSpecialTaskCounterIds, taskId],
+      state.data.savedCalendarTasks,
+    );
+  } else {
+    state.data.trackedSpecialTaskIds = state.data.trackedSpecialTaskIds.filter((id) => id !== taskId);
+  }
+  saveData();
+  const { gridStart, totalDays } = getCalendarGridRange();
+  renderSpecialTaskTracker(gridStart, totalDays);
 }
 
 function getCalendarGridRange() {
@@ -2314,6 +2559,388 @@ function makeSubtaskRow(parent, subtask, ownerLabel, afterChange) {
   return row;
 }
 
+/* ── Time tracking ── */
+
+function getDayTimeEntries(dateKey) {
+  return state.data.timeEntries[dateKey] || [];
+}
+
+function addTimeEntry(dateKey, entry) {
+  queueUndo("time tracking");
+  if (!state.data.timeEntries[dateKey]) state.data.timeEntries[dateKey] = [];
+  state.data.timeEntries[dateKey].push(entry);
+  saveData();
+  renderTimePie();
+}
+
+function clearDayTimeEntries() {
+  var entries = getDayTimeEntries(state.selectedDate);
+  if (!entries.length) return;
+  if (!window.confirm("Remove all tracked time for this day?")) return;
+  queueUndo("time entry removal");
+  delete state.data.timeEntries[state.selectedDate];
+  saveData();
+  renderTimePie();
+}
+
+function parseDurationInput(text) {
+  var value = String(text || "").trim().toLowerCase();
+  if (!value) return 0;
+  var match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (match) return (Number(match[1]) * 60 + Number(match[2])) * 60;
+  match = value.match(/^(\d+(?:\.\d+)?)\s*h(?:\s*(\d{1,2})\s*m?)?$/);
+  if (match) return Math.round(Number(match[1]) * 3600 + Number(match[2] || 0) * 60);
+  match = value.match(/^(\d+)\s*m$/);
+  if (match) return Number(match[1]) * 60;
+  match = value.match(/^(\d+)$/);
+  if (match) return Number(match[1]) * 60;
+  return 0;
+}
+
+function formatCountdown(totalSeconds) {
+  var total = Math.max(0, Math.floor(totalSeconds));
+  var hours = Math.floor(total / 3600);
+  var minutes = Math.floor((total % 3600) / 60);
+  var seconds = total % 60;
+  if (hours > 0) return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+  return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+}
+
+function formatHoursMinutes(totalSeconds) {
+  var total = Math.max(0, Math.floor(totalSeconds));
+  var hours = Math.floor(total / 3600);
+  var minutes = Math.round((total % 3600) / 60);
+  return hours + "h " + minutes + "m";
+}
+
+/* Timer engine */
+
+function liveElapsedSeconds() {
+  if (state.timer.status === "running" && state.timer.sessionStartEpoch) {
+    return Math.floor((Date.now() - state.timer.sessionStartEpoch) / 1000) + state.timer.accumulatedSeconds;
+  }
+  return state.timer.accumulatedSeconds;
+}
+
+function liveRemainingSeconds() {
+  return Math.max(0, state.timer.durationSeconds - liveElapsedSeconds());
+}
+
+function stopTick() {
+  if (state.timer.tickHandle) {
+    window.clearInterval(state.timer.tickHandle);
+    state.timer.tickHandle = null;
+  }
+}
+
+function startTimer() {
+  if (state.timer.status === "running") return;
+  var seconds = parseDurationInput(els.timerDurationInput.value);
+  if (seconds <= 0) {
+    els.timerDurationInput.classList.add("is-invalid");
+    return;
+  }
+  els.timerDurationInput.classList.remove("is-invalid");
+  ensureAudioContext();
+
+  var selection = els.timerTaskSelect.value;
+  var parts = selection ? selection.split(":") : ["", ""];
+  var taskId = parts[0];
+  var subtaskId = parts[1] || "";
+  var note = taskId ? (state.data.calendarNotes[state.selectedDate] || []).find(function (item) { return item.id === taskId; }) : null;
+  var subtask = subtaskId && note ? (note.subtasks || []).find(function (item) { return item.id === subtaskId; }) : null;
+
+  if (state.timer.status === "paused") {
+    state.timer.status = "running";
+    state.timer.sessionStartEpoch = Date.now();
+  } else {
+    state.timer.status = "running";
+    state.timer.dateKey = state.selectedDate;
+    state.timer.taskId = taskId;
+    state.timer.subtaskId = subtaskId;
+    state.timer.taskText = taskId ? (note ? note.text : "") : timeBreakLabel;
+    state.timer.color = note ? note.color : "";
+    state.timer.subtaskText = subtask ? subtask.text : "";
+    state.timer.durationSeconds = seconds;
+    state.timer.accumulatedSeconds = 0;
+    state.timer.sessionStartEpoch = Date.now();
+    state.timer.sessionStartedAt = new Date().toISOString();
+    state.timer.lastDisplayedSecond = -1;
+  }
+
+  state.timer.tickHandle = window.setInterval(tickTimer, 250);
+  renderTimerControls();
+  renderTimerDisplay();
+  renderTimePie();
+}
+
+function pauseTimer() {
+  if (state.timer.status !== "running") return;
+  state.timer.accumulatedSeconds = liveElapsedSeconds();
+  state.timer.sessionStartEpoch = null;
+  state.timer.status = "paused";
+  stopTick();
+  renderTimerControls();
+  renderTimerDisplay();
+  renderTimePie();
+}
+
+function tickTimer() {
+  var remaining = liveRemainingSeconds();
+  if (remaining !== state.timer.lastDisplayedSecond) {
+    state.timer.lastDisplayedSecond = remaining;
+    renderTimerDisplay();
+    renderTimePie();
+  }
+  if (remaining <= 0) finishTimer();
+}
+
+function finishTimer() {
+  stopTick();
+  state.timer.status = "finished";
+  state.timer.accumulatedSeconds = state.timer.durationSeconds;
+  state.timer.sessionStartEpoch = null;
+  playAlarm();
+  els.timerDisplay.classList.add("is-alarm");
+  renderTimerControls();
+  renderTimerDisplay();
+  renderTimePie();
+}
+
+function continueTimer() {
+  var extra = parseDurationInput(els.timerDurationInput.value) || defaultTimerMinutes * 60;
+  state.timer.durationSeconds += extra;
+  state.timer.status = "running";
+  state.timer.sessionStartEpoch = Date.now();
+  els.timerDisplay.classList.remove("is-alarm");
+  stopAlarm();
+  state.timer.tickHandle = window.setInterval(tickTimer, 250);
+  renderTimerControls();
+  renderTimerDisplay();
+  renderTimePie();
+}
+
+function stopTimer(save) {
+  if (state.timer.status === "idle") return;
+  stopTick();
+  stopAlarm();
+  els.timerDisplay.classList.remove("is-alarm");
+
+  var elapsed = state.timer.status === "finished"
+    ? state.timer.accumulatedSeconds
+    : liveElapsedSeconds();
+
+  if (save && elapsed > 0 && state.timer.dateKey) {
+    addTimeEntry(state.timer.dateKey, {
+      id: makeId("time"),
+      taskId: state.timer.taskId,
+      taskText: state.timer.taskText,
+      seconds: elapsed,
+      color: state.timer.color,
+      subtaskId: state.timer.subtaskId,
+      subtaskText: state.timer.subtaskText,
+      startedAt: state.timer.sessionStartedAt || "",
+      endedAt: new Date().toISOString(),
+    });
+  }
+
+  state.timer.status = "idle";
+  state.timer.taskId = "";
+  state.timer.subtaskId = "";
+  state.timer.taskText = "";
+  state.timer.color = "";
+  state.timer.durationSeconds = 0;
+  state.timer.accumulatedSeconds = 0;
+  state.timer.sessionStartEpoch = null;
+  state.timer.sessionStartedAt = null;
+  state.timer.lastDisplayedSecond = -1;
+  renderTimerControls();
+  renderTimerDisplay();
+  renderTimePie();
+}
+
+/* Alarm */
+
+function ensureAudioContext() {
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  if (!state.timer.audioContext) state.timer.audioContext = new AudioCtx();
+  if (state.timer.audioContext.state === "suspended") state.timer.audioContext.resume();
+}
+
+function playAlarm() {
+  ensureAudioContext();
+  var ctx = state.timer.audioContext;
+  if (!ctx) return;
+  var now = ctx.currentTime;
+
+  function beep(startTime, frequency) {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.4, startTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.14);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + 0.16);
+  }
+
+  for (var burst = 0; burst < 3; burst += 1) {
+    for (var i = 0; i < 3; i += 1) {
+      beep(now + burst * 0.9 + i * 0.26, burst === 1 ? 660 : 880);
+    }
+  }
+}
+
+function stopAlarm() {
+  if (!state.timer.audioContext) return;
+  state.timer.audioContext.suspend().catch(function () {});
+}
+
+/* Pie chart */
+
+var PIE_RADIUS = 45;
+var PIE_CIRCUMFERENCE = 2 * Math.PI * PIE_RADIUS;
+
+function getDayTimeBuckets(dateKey, includeBreak) {
+  if (includeBreak === undefined) includeBreak = true;
+  var buckets = new Map();
+
+  function addSeconds(key, label, color, seconds) {
+    if (seconds <= 0) return;
+    var bucket = buckets.get(key) || { key: key, label: label, color: color, seconds: 0 };
+    bucket.seconds += seconds;
+    buckets.set(key, bucket);
+  }
+
+  (state.data.timeEntries[dateKey] || []).forEach(function (entry) {
+    if (!includeBreak && !entry.taskId) return;
+    addSeconds(entry.taskId || "break", entry.taskText || "Untitled", entry.color, entry.seconds);
+  });
+
+  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey && (includeBreak || state.timer.taskId)) {
+    addSeconds(state.timer.taskId || "break", state.timer.taskText || "Untitled", state.timer.color, liveElapsedSeconds());
+  }
+
+  var result = [];
+  buckets.forEach(function (bucket) { result.push(bucket); });
+  result.sort(function (a, b) { return b.seconds - a.seconds; });
+  return result;
+}
+
+function renderTimePie() {
+  var includeBreak = els.showBreakInChartCheckbox.checked;
+  var buckets = getDayTimeBuckets(state.selectedDate, includeBreak);
+  var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
+
+  els.timePieSlices.innerHTML = "";
+  var offset = 0;
+  buckets.forEach(function (bucket) {
+    var fraction = total > 0 ? bucket.seconds / total : 0;
+    var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    slice.setAttribute("class", "time-slice");
+    slice.setAttribute("cx", "60");
+    slice.setAttribute("cy", "60");
+    slice.setAttribute("r", String(PIE_RADIUS));
+    slice.setAttribute("transform", "rotate(-90 60 60)");
+    slice.setAttribute("stroke-dasharray", fraction * PIE_CIRCUMFERENCE + " " + PIE_CIRCUMFERENCE);
+    slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
+    var color = bucket.key === "break" ? breakTrackColor : getCalendarTaskColor(bucket.color);
+    slice.style.stroke = color.color;
+    els.timePieSlices.append(slice);
+    offset += fraction;
+  });
+
+  els.timeChartTotal.textContent = formatHoursMinutes(total);
+  if (total > 0) {
+    var labelText = buckets.map(function (b) {
+      return b.label + " " + formatHoursMinutes(b.seconds);
+    }).join(", ");
+    els.timePieChart.setAttribute("aria-label", "Tracked time: " + labelText);
+  } else {
+    els.timePieChart.setAttribute("aria-label", "No time tracked");
+  }
+  renderTimeLegend(buckets);
+}
+
+function renderTimeLegend(buckets) {
+  els.timeLegend.innerHTML = "";
+  els.timeLegend.hidden = !buckets.length;
+  buckets.forEach(function (bucket) {
+    var item = document.createElement("div");
+    item.className = "time-legend-item";
+    var swatch = document.createElement("span");
+    swatch.className = "time-legend-swatch";
+    swatch.style.background = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
+    var label = document.createElement("span");
+    label.className = "time-legend-label";
+    label.textContent = bucket.key === "break" ? timeBreakLabel : bucket.label;
+    label.title = label.textContent;
+    var seconds = document.createElement("span");
+    seconds.className = "time-legend-seconds";
+    seconds.textContent = formatHoursMinutes(bucket.seconds);
+    item.append(swatch, label, seconds);
+    els.timeLegend.append(item);
+  });
+}
+
+/* Task selector */
+
+function renderTimerTaskSelect() {
+  var isActive = state.timer.status !== "idle";
+  var previousValue = isActive ? "" : els.timerTaskSelect.value;
+  els.timerTaskSelect.innerHTML = "";
+  els.timerTaskSelect.append(makeOption("", timeBreakLabel));
+
+  sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []).forEach(function (note) {
+    els.timerTaskSelect.append(makeOption(note.id, note.text));
+    (note.subtasks || []).forEach(function (subtask) {
+      els.timerTaskSelect.append(makeOption(note.id + ":" + subtask.id, "— " + subtask.text));
+    });
+  });
+
+  if (isActive) {
+    var activeValue = state.timer.taskId
+      ? state.timer.taskId + (state.timer.subtaskId ? ":" + state.timer.subtaskId : "")
+      : "";
+    if (activeValue && !els.timerTaskSelect.querySelector("option[value=\"" + activeValue + "\"]")) {
+      var activeLabel = state.timer.subtaskText ? "— " + state.timer.subtaskText : state.timer.taskText;
+      els.timerTaskSelect.append(makeOption(activeValue, activeLabel));
+    }
+    els.timerTaskSelect.value = activeValue;
+  } else if (previousValue && els.timerTaskSelect.querySelector("option[value=\"" + previousValue + "\"]")) {
+    els.timerTaskSelect.value = previousValue;
+  }
+  els.timerTaskSelect.disabled = isActive;
+}
+
+/* Control renderers */
+
+function renderTimerDisplay() {
+  var remaining = liveRemainingSeconds();
+  els.timerTimeText.textContent = formatCountdown(remaining);
+  els.timerStatusText.textContent = {
+    idle: "Timer idle",
+    running: "Timer running — " + formatCountdown(remaining) + " remaining",
+    paused: "Timer paused",
+    finished: "Time is up",
+  }[state.timer.status];
+}
+
+function renderTimerControls() {
+  var status = state.timer.status;
+  els.timerStartButton.hidden = status === "running" || status === "finished";
+  els.timerStartButton.textContent = status === "paused" ? "Resume" : "Start";
+  els.timerPauseButton.hidden = status !== "running";
+  els.timerStopButton.hidden = status === "idle" || status === "finished";
+  els.timerFinishedControls.hidden = status !== "finished";
+  els.clearTimeEntriesButton.hidden = !getDayTimeEntries(state.selectedDate).length;
+  renderTimerTaskSelect();
+}
+
 function renderSelectedDateNotes() {
   els.selectedDateInput.value = state.selectedDate;
   els.selectedDatePicker.value = state.selectedDate;
@@ -2327,6 +2954,9 @@ function renderSelectedDateNotes() {
   getGoalsForDate(state.selectedDate).forEach((goalMatch) => {
     els.selectedDateNotes.append(makeCalendarGoalTask(goalMatch, "selected"));
   });
+
+  renderTimerTaskSelect();
+  renderTimePie();
 }
 
 function renderJournalLabelOptions(selectedLabel = els.journalLabel.value) {
@@ -3229,7 +3859,18 @@ function groupJournalEntries(entries) {
     groups.get(key).entries.push(entry);
   });
 
-  return [...groups.values()];
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      entries: sortedJournalEntries(group.entries),
+    }))
+    .sort((a, b) => {
+      const dateCompare = (b.date || "").localeCompare(a.date || "");
+      if (dateCompare) return dateCompare;
+      const entryCompare = compareEntryDateTime(a.entries[0] || {}, b.entries[0] || {});
+      if (entryCompare) return entryCompare;
+      return (a.location || "").localeCompare(b.location || "");
+    });
 }
 
 function makeJournalEntryMenu(entry) {

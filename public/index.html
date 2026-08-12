@@ -57,16 +57,65 @@
             <div class="emoji-section" aria-label="Day emoji markers">
               <div class="emoji-palette" id="emojiPalette"></div>
             </div>
-            <form id="calendarNoteForm" class="stacked-form">
-              <div class="special-task-shelf" aria-label="Special calendar tasks">
-                <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
-                <div class="special-task-list" id="specialTaskList"></div>
-              </div>
-              <label>
-                <span>Task</span>
-                <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
-              </label>
-            </form>
+            <div class="side-panel-split">
+              <form id="calendarNoteForm" class="stacked-form">
+                <div class="special-task-shelf" aria-label="Special calendar tasks">
+                  <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
+                  <div class="special-task-list" id="specialTaskList"></div>
+                </div>
+                <label>
+                  <span>Task</span>
+                  <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+                </label>
+              </form>
+
+              <section class="time-panel" aria-label="Time tracking">
+                <div class="time-panel-head">
+                  <h2 class="time-panel-title">Time Pie</h2>
+                  <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
+                </div>
+
+                <div class="time-chart">
+                  <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
+                    <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
+                    <g id="timePieSlices"></g>
+                  </svg>
+                  <div class="time-chart-center">
+                    <span class="time-chart-total" id="timeChartTotal">0h 0m</span>
+                  </div>
+                </div>
+                <div class="time-legend" id="timeLegend" hidden></div>
+
+                <div class="timer-controls">
+                  <label>
+                    <span>Track</span>
+                    <select id="timerTaskSelect" aria-label="Task to track"></select>
+                  </label>
+                  <label>
+                    <span>Duration</span>
+                    <input id="timerDurationInput" type="text" placeholder="25m" value="25m">
+                  </label>
+                  <div class="timer-display" id="timerDisplay">
+                    <span id="timerTimeText" aria-hidden="true">00:00</span>
+                    <span class="sr-only" id="timerStatusText" aria-live="polite">Timer idle</span>
+                  </div>
+                  <div class="timer-buttons">
+                    <button class="primary-button" type="button" id="timerStartButton">Start</button>
+                    <button class="ghost-button" type="button" id="timerPauseButton" hidden>Pause</button>
+                    <button class="ghost-button" type="button" id="timerStopButton" hidden>Stop</button>
+                  </div>
+                  <div class="timer-finished" id="timerFinishedControls" hidden>
+                    <span>Time is up!</span>
+                    <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
+                    <button class="primary-button" type="button" id="timerEndButton">End</button>
+                  </div>
+                  <label class="time-chart-toggle">
+                    <input type="checkbox" id="showBreakInChartCheckbox" checked>
+                    <span>Show breaks in chart</span>
+                  </label>
+                </div>
+              </section>
+            </div>
             <div class="mini-list" id="selectedDateNotes"></div>
           </aside>
 
