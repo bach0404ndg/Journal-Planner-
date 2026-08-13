@@ -2650,6 +2650,7 @@ textarea:focus {
 .time-chart-area {
   flex: 1 1 210px;
   min-height: 100px;
+  max-height: 260px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2661,8 +2662,9 @@ textarea:focus {
 
 .time-chart {
   position: relative;
-  width: 100%;
-  max-width: 200px;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
   aspect-ratio: 1;
 }
 
