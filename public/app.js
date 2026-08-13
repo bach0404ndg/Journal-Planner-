@@ -2134,7 +2134,6 @@ function moveCalendarTask(sourceDateKey, noteId, targetDateKey) {
     state.data.calendarNotes[sourceDateKey] = sourceNotes;
   }
   state.data.calendarNotes[targetDateKey] = [...(state.data.calendarNotes[targetDateKey] || []), note];
-  setCalendarDate(targetDateKey);
   saveData();
   renderCalendar();
   renderSelectedDateNotes();
@@ -2147,7 +2146,6 @@ function moveGoalTaskDate(sectionId, goalId, targetDateKey) {
 
   queueUndo("goal date move");
   goal.dueDate = targetDateKey;
-  setCalendarDate(targetDateKey);
   saveData();
   renderCalendar();
   renderSelectedDateNotes();
