@@ -2905,9 +2905,7 @@ function stopAlarm() {
 
 var PIE_RADIUS = 45;
 var PIE_CIRCUMFERENCE = 2 * Math.PI * PIE_RADIUS;
-var PIE_DIVIDER_LENGTH = PIE_CIRCUMFERENCE * 0.012;
 var SUBTASK_LIGHTEN_AMOUNT = 0.4;
-var DIRECT_TIME_KEY = "__direct__";
 
 function lightenHexColor(hex, amount) {
   var match = /^#([0-9a-f]{6})$/i.exec(String(hex || ""));
@@ -2925,62 +2923,28 @@ function lightenHexColor(hex, amount) {
 function getDayTimeBuckets(dateKey) {
   var buckets = new Map();
 
-  function addSeconds(taskKey, taskLabel, color, subtaskId, subtaskLabel, seconds) {
+  function addSeconds(taskKey, taskLabel, color, seconds) {
     if (seconds <= 0) return;
     var bucket = buckets.get(taskKey);
     if (!bucket) {
-      bucket = { key: taskKey, label: taskLabel, color: color, seconds: 0, subBuckets: new Map() };
+      bucket = { key: taskKey, label: taskLabel, color: color, seconds: 0 };
       buckets.set(taskKey, bucket);
     }
     bucket.seconds += seconds;
-    var subKey = subtaskId || DIRECT_TIME_KEY;
-    var sub = bucket.subBuckets.get(subKey);
-    if (!sub) {
-      sub = { key: subKey, label: subtaskLabel || "", seconds: 0 };
-      bucket.subBuckets.set(subKey, sub);
-    }
-    sub.seconds += seconds;
   }
 
   (state.data.timeEntries[dateKey] || []).forEach(function (entry) {
-    addSeconds(entry.taskId || "break", entry.taskText || "Untitled", entry.color, entry.subtaskId, entry.subtaskText, entry.seconds);
+    addSeconds(entry.taskId || "break", entry.taskText || "Untitled", entry.color, entry.seconds);
   });
 
   if (state.timer.status !== "idle" && state.timer.dateKey === dateKey) {
-    addSeconds(state.timer.taskId || "break", state.timer.taskText || "Untitled", state.timer.color, state.timer.subtaskId, state.timer.subtaskText, liveElapsedSeconds());
+    addSeconds(state.timer.taskId || "break", state.timer.taskText || "Untitled", state.timer.color, liveElapsedSeconds());
   }
 
   var result = [];
-  buckets.forEach(function (bucket) {
-    var subResult = [];
-    bucket.subBuckets.forEach(function (sub) { subResult.push(sub); });
-    subResult.sort(function (a, b) {
-      if (a.key === DIRECT_TIME_KEY) return -1;
-      if (b.key === DIRECT_TIME_KEY) return 1;
-      return b.seconds - a.seconds;
-    });
-    bucket.subBuckets = subResult;
-    result.push(bucket);
-  });
+  buckets.forEach(function (bucket) { result.push(bucket); });
   result.sort(function (a, b) { return b.seconds - a.seconds; });
   return result;
-}
-
-function getMergedTimeSegments(buckets) {
-  var segments = [];
-  buckets.forEach(function (bucket) {
-    bucket.subBuckets.forEach(function (sub) {
-      segments.push({
-        key: bucket.key + ":" + sub.key,
-        taskKey: bucket.key,
-        label: sub.key === DIRECT_TIME_KEY || bucket.key === "break" ? bucket.label : bucket.label + " — " + sub.label,
-        color: bucket.color,
-        seconds: sub.seconds,
-        isSubtask: sub.key !== DIRECT_TIME_KEY,
-      });
-    });
-  });
-  return segments;
 }
 
 function getSequentialTimeSegments(dateKey) {
@@ -3015,17 +2979,12 @@ function getSequentialTimeSegments(dateKey) {
 }
 
 function renderPieSlices(buckets, total) {
-  var segments = getMergedTimeSegments(buckets);
   state.lastChartTotalSeconds = total;
 
   els.timePieSlices.innerHTML = "";
   var offset = 0;
-  segments.forEach(function (segment, index) {
-    var fraction = total > 0 ? segment.seconds / total : 0;
-    var nextSegment = segments[index + 1];
-    var needsDivider = nextSegment && nextSegment.taskKey === segment.taskKey;
-    var dashLength = fraction * PIE_CIRCUMFERENCE;
-    if (needsDivider) dashLength = Math.max(0, dashLength - PIE_DIVIDER_LENGTH);
+  buckets.forEach(function (bucket) {
+    var fraction = total > 0 ? bucket.seconds / total : 0;
 
     var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     slice.setAttribute("class", "time-slice");
@@ -3033,13 +2992,12 @@ function renderPieSlices(buckets, total) {
     slice.setAttribute("cy", "60");
     slice.setAttribute("r", String(PIE_RADIUS));
     slice.setAttribute("transform", "rotate(-90 60 60)");
-    slice.setAttribute("stroke-dasharray", dashLength + " " + PIE_CIRCUMFERENCE);
+    slice.setAttribute("stroke-dasharray", fraction * PIE_CIRCUMFERENCE + " " + PIE_CIRCUMFERENCE);
     slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
-    var baseColor = segment.taskKey === "break" ? breakTrackColor.color : getCalendarTaskColor(segment.color).color;
-    slice.style.stroke = segment.isSubtask ? lightenHexColor(baseColor, SUBTASK_LIGHTEN_AMOUNT) : baseColor;
+    slice.style.stroke = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
 
     slice.addEventListener("pointerenter", function () {
-      els.timeChartTotal.textContent = formatHoursMinutes(segment.seconds);
+      els.timeChartTotal.textContent = formatHoursMinutes(bucket.seconds);
     });
     slice.addEventListener("pointerleave", function () {
       els.timeChartTotal.textContent = formatHoursMinutes(state.lastChartTotalSeconds || 0);
@@ -3051,8 +3009,9 @@ function renderPieSlices(buckets, total) {
 
   els.timeChartTotal.textContent = formatHoursMinutes(total);
   if (total > 0) {
-    var labelText = segments.map(function (s) {
-      return s.label + " " + formatHoursMinutes(s.seconds);
+    var labelText = buckets.map(function (bucket) {
+      var label = bucket.key === "break" ? timeBreakLabel : bucket.label;
+      return label + " " + formatHoursMinutes(bucket.seconds);
     }).join(", ");
     els.timePieChart.setAttribute("aria-label", "Tracked time: " + labelText);
   } else {
