@@ -76,12 +76,12 @@
 
               <section class="time-panel" aria-label="Time tracking">
                 <div class="time-panel-head">
-                  <h2 class="time-panel-title">Time Pie</h2>
+                  <h2 class="time-panel-title">Time Tracker</h2>
                   <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
                 </div>
 
-                <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Time Pie display">
-                  <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Pie</button>
+                <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Time Tracker view">
+                  <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Timer</button>
                   <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">History</button>
                 </div>
 
@@ -137,10 +137,10 @@
                     <button class="timer-adjust-button" type="button" id="timerAddButton" aria-label="Add 5 minutes" hidden>+</button>
                   </div>
                   <div class="timer-buttons">
-                    <button class="primary-button" type="button" id="timerStartButton">Start</button>
-                    <button class="ghost-button" type="button" id="timerPauseButton" hidden>Pause</button>
-                    <button class="ghost-button" type="button" id="timerStopButton" hidden>Stop</button>
+                    <button class="primary-button timer-main-button" type="button" id="timerStartButton">Start</button>
+                    <button class="ghost-button timer-main-button" type="button" id="timerStopButton" hidden>Stop</button>
                   </div>
+                  <button class="timer-pause-link" type="button" id="timerPauseButton" hidden>Pause</button>
                   <div class="timer-finished" id="timerFinishedControls" hidden>
                     <span>Time is up!</span>
                     <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
@@ -148,6 +148,7 @@
                   </div>
                   <div class="timer-stop-confirm" id="timerStopConfirm" hidden>
                     <span>Save tracked time?</span>
+                    <button class="ghost-button" type="button" id="timerStopResumeButton">Resume</button>
                     <button class="primary-button" type="button" id="timerStopSaveButton">Save</button>
                     <button class="ghost-button" type="button" id="timerStopDiscardButton">Discard</button>
                   </div>

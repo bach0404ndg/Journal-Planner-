@@ -2753,6 +2753,14 @@ textarea:focus {
   color: var(--green-meta);
 }
 
+.time-legend-time {
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(22, 51, 33, 0.42);
+}
+
 .time-legend-duration {
   flex: 0 0 auto;
 }
@@ -3051,11 +3059,38 @@ textarea:focus {
   display: none;
 }
 
+.timer-main-button {
+  min-height: 40px;
+  padding: 0 24px;
+  font-size: 0.88rem;
+}
+
+.timer-pause-link {
+  display: block;
+  margin: 0 auto;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: rgba(22, 51, 33, 0.5);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.timer-pause-link:hover {
+  color: var(--green-meta);
+}
+
+.timer-pause-link[hidden] {
+  display: none;
+}
+
 .timer-stop-confirm {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -3065,22 +3100,17 @@ textarea:focus {
 
 .timer-stop-confirm span {
   color: var(--green-meta);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 800;
+  width: 100%;
+  text-align: center;
 }
 
-.timer-stop-confirm button {
-  min-height: 38px;
-  padding: 0 16px;
-  font-size: 0.88rem;
-}
-
-.timer-buttons button,
 .timer-finished button,
 .timer-stop-confirm button {
-  min-height: 32px;
-  padding: 0 14px;
-  font-size: 0.8rem;
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 0.72rem;
 }
 
 .timer-finished {

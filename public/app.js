@@ -63,6 +63,7 @@ const calendarTaskColors = [
 const timeBreakLabel = "Break";
 const breakTrackColor = { color: "rgba(22, 51, 33, 0.38)", tint: "rgba(22, 51, 33, 0.08)" };
 const defaultTimerMinutes = 25;
+const defaultBreakMinutes = 5;
 
 const goalPaperColors = [
   { id: "", name: "Paper", color: "rgba(22, 51, 33, 0.24)", tint: "rgba(255, 255, 255, 0.28)" },
@@ -220,6 +221,7 @@ const els = {
   timerEndButton: document.querySelector("#timerEndButton"),
   timerFinishedControls: document.querySelector("#timerFinishedControls"),
   timerStopConfirm: document.querySelector("#timerStopConfirm"),
+  timerStopResumeButton: document.querySelector("#timerStopResumeButton"),
   timerStopSaveButton: document.querySelector("#timerStopSaveButton"),
   timerStopDiscardButton: document.querySelector("#timerStopDiscardButton"),
 };
@@ -730,6 +732,7 @@ function init() {
   ensureStarterSections();
   renderJournalLabelOptions();
   renderAll();
+  applyDefaultTimerDuration();
   requestAnimationFrame(resizeJournalFormText);
   updateUndoButton();
 }
@@ -913,12 +916,14 @@ function bindEvents() {
   els.timerStopButton.addEventListener("click", confirmStopTimer);
   els.timerContinueButton.addEventListener("click", continueTimer);
   els.timerEndButton.addEventListener("click", function () { stopTimer(true); });
+  els.timerStopResumeButton.addEventListener("click", cancelStopConfirm);
   els.timerStopSaveButton.addEventListener("click", saveAndStop);
   els.timerStopDiscardButton.addEventListener("click", discardAndStop);
   els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
   bindDurationMaskInput(els.timerDurationMinutes, 99, function () {
     els.timerDurationMask.classList.remove("is-invalid");
   });
+  els.timerTaskSelect.addEventListener("change", applyDefaultTimerDuration);
   els.timerSubtractButton.addEventListener("click", function () { adjustTimerDuration(-5 * 60); });
   els.timerAddButton.addEventListener("click", function () { adjustTimerDuration(5 * 60); });
   els.timeChartModeMergedButton.addEventListener("click", function () {
@@ -1705,6 +1710,7 @@ function renderAll() {
   setTimePanelView(state.timePanelView);
   els.timeChartArea.hidden = state.timeChartMode !== "merged";
   els.timeSequenceList.hidden = state.timeChartMode !== "sequence";
+  els.timerSession.hidden = state.timeChartMode !== "merged";
   els.timeChartModeMergedButton.classList.toggle("is-active", state.timeChartMode === "merged");
   els.timeChartModeSequenceButton.classList.toggle("is-active", state.timeChartMode === "sequence");
   renderTimePie();
@@ -2668,6 +2674,14 @@ function writeMinutesInputSeconds(minutesInput, totalSeconds) {
   minutesInput.value = String(Math.max(0, Math.round(totalSeconds / 60))).padStart(2, "0");
 }
 
+function applyDefaultTimerDuration() {
+  if (state.timer.status !== "idle") return;
+  var isBreak = !els.timerTaskSelect.value;
+  var minutes = isBreak ? defaultBreakMinutes : defaultTimerMinutes;
+  els.timerDurationMinutes.value = String(minutes).padStart(2, "0");
+  els.timerDurationMask.classList.remove("is-invalid");
+}
+
 function formatCountdown(totalSeconds) {
   var total = Math.max(0, Math.floor(totalSeconds));
   var hours = Math.floor(total / 3600);
@@ -2675,6 +2689,17 @@ function formatCountdown(totalSeconds) {
   var seconds = total % 60;
   if (hours > 0) return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
   return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+}
+
+function formatClockTime(iso) {
+  if (!iso) return "";
+  var date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  var hours = date.getHours();
+  var minutes = date.getMinutes();
+  var period = hours >= 12 ? "PM" : "AM";
+  var displayHours = hours % 12 || 12;
+  return displayHours + ":" + String(minutes).padStart(2, "0") + " " + period;
 }
 
 function formatHoursMinutes(totalSeconds) {
@@ -2999,6 +3024,7 @@ function getSequentialTimeSegments(dateKey) {
       subtaskId: state.timer.subtaskId,
       subtaskText: state.timer.subtaskText,
       seconds: liveElapsedSeconds(),
+      startedAt: state.timer.sessionStartedAt || "",
     });
   }
   return entries.filter(function (entry) { return entry.seconds > 0; }).map(function (entry) {
@@ -3012,6 +3038,8 @@ function getSequentialTimeSegments(dateKey) {
       color: entry.color,
       seconds: entry.seconds,
       isSubtask: !!entry.subtaskId,
+      startedAt: entry.startedAt || "",
+      endedAt: entry.endedAt || "",
     };
   });
 }
@@ -3246,7 +3274,12 @@ function makeSequenceRow(segment) {
   var timeText = document.createElement("span");
   timeText.className = "time-legend-seconds";
   timeText.textContent = formatHoursMinutes(segment.seconds);
-  item.append(swatch, label, timeText);
+
+  var clockText = document.createElement("span");
+  clockText.className = "time-legend-time";
+  clockText.textContent = formatClockTime(segment.startedAt || segment.endedAt);
+
+  item.append(swatch, label, timeText, clockText);
 
   if (!isLive) {
     var editButton = document.createElement("button");
@@ -3330,6 +3363,7 @@ function setTimeChartMode(mode) {
   state.historyAddOpen = false;
   els.timeChartArea.hidden = mode !== "merged";
   els.timerControls.hidden = mode !== "merged";
+  els.timerSession.hidden = mode !== "merged";
   els.timeSequenceList.hidden = mode !== "sequence";
   els.timeChartModeMergedButton.classList.toggle("is-active", mode === "merged");
   els.timeChartModeSequenceButton.classList.toggle("is-active", mode === "sequence");
