@@ -2755,6 +2755,7 @@ textarea:focus {
 
 .time-legend-time {
   flex: 0 0 auto;
+  width: 60px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 0.7rem;
   font-weight: 600;
@@ -2825,21 +2826,6 @@ textarea:focus {
   display: none;
 }
 
-.time-legend-add {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.time-legend-add[hidden] {
-  display: none;
-}
-
-.time-legend-add select {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .time-legend-inline-add {
   display: grid;
   place-items: center;
@@ -2871,28 +2857,6 @@ textarea:focus {
   min-width: 0;
   min-height: 36px;
   font-size: 0.82rem;
-}
-
-.time-legend-add-button {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0;
-  border: 1px solid var(--green);
-  border-radius: 999px;
-  color: white;
-  background: var(--green);
-  font-size: 1rem;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.time-legend-add-button:hover {
-  border-color: var(--green-dark);
-  background: var(--green-active);
 }
 
 .timer-controls {
@@ -3063,27 +3027,6 @@ textarea:focus {
   min-height: 40px;
   padding: 0 24px;
   font-size: 0.88rem;
-}
-
-.timer-pause-link {
-  display: block;
-  margin: 0 auto;
-  padding: 2px 6px;
-  border: 0;
-  background: transparent;
-  color: rgba(22, 51, 33, 0.5);
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.timer-pause-link:hover {
-  color: var(--green-meta);
-}
-
-.timer-pause-link[hidden] {
-  display: none;
 }
 
 .timer-stop-confirm {

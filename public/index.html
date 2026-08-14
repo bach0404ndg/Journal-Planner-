@@ -101,17 +101,6 @@
 
                 <div class="timer-controls" id="timerControls">
                   <div class="time-legend" id="timeLegend"></div>
-
-                  <div class="time-legend-add" id="timeLegendAdd" hidden>
-                    <select id="legendAddTaskSelect" aria-label="Task to add tracked time for"></select>
-                    <div class="duration-mask time-legend-duration" id="legendAddDurationMask">
-                      <input id="legendAddDurationHours" type="text" inputmode="numeric" maxlength="2" value="00" aria-label="Hours to add">
-                      <span class="duration-mask-unit">h</span>
-                      <input id="legendAddDurationMinutes" type="text" inputmode="numeric" maxlength="2" value="00" aria-label="Minutes to add">
-                      <span class="duration-mask-unit">m</span>
-                    </div>
-                    <button class="time-legend-add-button" type="button" id="legendAddButton" aria-label="Add tracked time">+</button>
-                  </div>
                 </div>
 
                 <div class="timer-session" id="timerSession">
@@ -140,7 +129,6 @@
                     <button class="primary-button timer-main-button" type="button" id="timerStartButton">Start</button>
                     <button class="ghost-button timer-main-button" type="button" id="timerStopButton" hidden>Stop</button>
                   </div>
-                  <button class="timer-pause-link" type="button" id="timerPauseButton" hidden>Pause</button>
                   <div class="timer-finished" id="timerFinishedControls" hidden>
                     <span>Time is up!</span>
                     <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
