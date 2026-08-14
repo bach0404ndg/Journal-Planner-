@@ -2759,7 +2759,7 @@ textarea:focus {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 0.7rem;
   font-weight: 600;
-  color: rgba(22, 51, 33, 0.42);
+  color: var(--ink);
 }
 
 .time-legend-duration {
