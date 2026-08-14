@@ -201,8 +201,6 @@ const els = {
   timeViewTimerButton: document.querySelector("#timeViewTimerButton"),
   timerSession: document.querySelector("#timerSession"),
   timerTaskSelect: document.querySelector("#timerTaskSelect"),
-  timerDurationMask: document.querySelector("#timerDurationMask"),
-  timerDurationMinutes: document.querySelector("#timerDurationMinutes"),
   timerSubtractButton: document.querySelector("#timerSubtractButton"),
   timerAddButton: document.querySelector("#timerAddButton"),
   timerDisplay: document.querySelector("#timerDisplay"),
@@ -725,7 +723,6 @@ function init() {
   ensureStarterSections();
   renderJournalLabelOptions();
   renderAll();
-  applyDefaultTimerDuration();
   requestAnimationFrame(resizeJournalFormText);
   updateUndoButton();
 }
@@ -912,10 +909,7 @@ function bindEvents() {
   els.timerStopSaveButton.addEventListener("click", saveAndStop);
   els.timerStopDiscardButton.addEventListener("click", discardAndStop);
   els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
-  bindDurationMaskInput(els.timerDurationMinutes, 99, function () {
-    els.timerDurationMask.classList.remove("is-invalid");
-  });
-  els.timerTaskSelect.addEventListener("change", applyDefaultTimerDuration);
+  els.timerTaskSelect.addEventListener("change", renderTimerDisplay);
   els.timerSubtractButton.addEventListener("click", function () { adjustTimerDuration(-5 * 60); });
   els.timerAddButton.addEventListener("click", function () { adjustTimerDuration(5 * 60); });
   els.timeChartModeMergedButton.addEventListener("click", function () {
@@ -1701,6 +1695,7 @@ function renderAll() {
   renderTimePie();
   renderGoals();
   renderJournal();
+  renderTimerDisplay();
 }
 
 function defaultCleanupDateKey() {
@@ -2651,20 +2646,8 @@ function bindDurationMaskInput(input, max, onChange) {
   });
 }
 
-function readMinutesInputSeconds(minutesInput) {
-  return Math.max(0, parseInt(minutesInput.value, 10) || 0) * 60;
-}
-
-function writeMinutesInputSeconds(minutesInput, totalSeconds) {
-  minutesInput.value = String(Math.max(0, Math.round(totalSeconds / 60))).padStart(2, "0");
-}
-
-function applyDefaultTimerDuration() {
-  if (state.timer.status !== "idle") return;
-  var isBreak = !els.timerTaskSelect.value;
-  var minutes = isBreak ? defaultBreakMinutes : defaultTimerMinutes;
-  els.timerDurationMinutes.value = String(minutes).padStart(2, "0");
-  els.timerDurationMask.classList.remove("is-invalid");
+function defaultTimerDurationSeconds() {
+  return (els.timerTaskSelect.value ? defaultTimerMinutes : defaultBreakMinutes) * 60;
 }
 
 function formatCountdown(totalSeconds) {
@@ -2717,12 +2700,7 @@ function stopTick() {
 
 function startTimer() {
   if (state.timer.status === "running") return;
-  var seconds = readMinutesInputSeconds(els.timerDurationMinutes);
-  if (seconds <= 0) {
-    els.timerDurationMask.classList.add("is-invalid");
-    return;
-  }
-  els.timerDurationMask.classList.remove("is-invalid");
+  var seconds = defaultTimerDurationSeconds();
   ensureAudioContext();
 
   var selection = els.timerTaskSelect.value;
@@ -2790,7 +2768,7 @@ function finishTimer() {
 }
 
 function continueTimer() {
-  var extra = readMinutesInputSeconds(els.timerDurationMinutes) || defaultTimerMinutes * 60;
+  var extra = defaultTimerDurationSeconds();
   state.timer.durationSeconds += extra;
   state.timer.status = "running";
   state.timer.sessionStartEpoch = Date.now();
@@ -3440,7 +3418,7 @@ function renderTimerTaskSelect() {
 /* Control renderers */
 
 function renderTimerDisplay() {
-  var remaining = liveRemainingSeconds();
+  var remaining = state.timer.status === "idle" ? defaultTimerDurationSeconds() : liveRemainingSeconds();
   els.timerTimeText.textContent = formatCountdown(remaining);
   els.timerStatusText.textContent = {
     idle: "Timer idle",
@@ -3483,6 +3461,7 @@ function renderSelectedDateNotes() {
 
   renderTimerTaskSelect();
   renderTimePie();
+  renderTimerDisplay();
 }
 
 function renderJournalLabelOptions(selectedLabel = els.journalLabel.value) {
