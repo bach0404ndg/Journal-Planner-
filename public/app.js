@@ -2626,8 +2626,8 @@ function writeDurationMaskSeconds(hoursInput, minutesInput, totalSeconds) {
     minutes = 0;
     hours += 1;
   }
-  hoursInput.value = String(hours).padStart(2, "0");
-  minutesInput.value = String(minutes).padStart(2, "0");
+  hoursInput.value = String(hours);
+  minutesInput.value = String(minutes);
 }
 
 function sanitizeDurationMaskInput(input, max) {
@@ -2642,7 +2642,7 @@ function bindDurationMaskInput(input, max, onChange) {
     if (onChange) onChange();
   });
   input.addEventListener("blur", function () {
-    input.value = String(Math.max(0, parseInt(input.value, 10) || 0)).padStart(2, "0");
+    input.value = String(Math.max(0, parseInt(input.value, 10) || 0));
   });
 }
 
@@ -3083,8 +3083,8 @@ function makeHistoryAddRow() {
     var minutesUnit = document.createElement("span");
     minutesUnit.className = "duration-mask-unit";
     minutesUnit.textContent = "m";
-    hoursInput.value = "00";
-    minutesInput.value = "00";
+    hoursInput.value = "0";
+    minutesInput.value = "0";
     bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
     bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
     durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
