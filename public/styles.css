@@ -2810,6 +2810,10 @@ textarea:focus {
   background: rgba(var(--green-rgb), 0.1);
 }
 
+.time-legend-edit + .time-legend-delete {
+  margin-left: -5px;
+}
+
 .time-legend-item.is-editing {
   align-items: center;
 }
