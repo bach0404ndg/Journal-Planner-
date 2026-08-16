@@ -3019,7 +3019,14 @@ function renderPieSlices(buckets, total) {
   }
 }
 
+var timeSequenceOutsideHandler = null;
+
 function renderTimeSequenceList(dateKey) {
+  if (timeSequenceOutsideHandler) {
+    document.removeEventListener("mousedown", timeSequenceOutsideHandler);
+    timeSequenceOutsideHandler = null;
+  }
+
   var segments = getSequentialTimeSegments(dateKey);
   els.timeSequenceList.innerHTML = "";
 
@@ -3035,6 +3042,18 @@ function renderTimeSequenceList(dateKey) {
   });
 
   els.timeSequenceList.append(makeHistoryAddRow());
+
+  if (state.editingSequenceEntryId) {
+    timeSequenceOutsideHandler = function (event) {
+      if (!state.editingSequenceEntryId) return;
+      var row = els.timeSequenceList.querySelector(".time-legend-item.time-legend-edit-row");
+      if (!row || row.contains(event.target)) return;
+      var mask = row.querySelector(".duration-mask");
+      var inputs = mask.querySelectorAll("input");
+      saveSequenceEntryEdit(state.editingSequenceEntryId, inputs[0], inputs[1], mask, true);
+    };
+    document.addEventListener("mousedown", timeSequenceOutsideHandler);
+  }
 }
 
 function makeHistoryAddRow() {
@@ -3152,7 +3171,7 @@ function makeSequenceRow(segment) {
   label.title = segment.label;
 
   if (!isLive && state.editingSequenceEntryId === segment.key) {
-    item.classList.add("is-editing");
+    item.classList.add("is-editing", "time-legend-edit-row");
 
     var durationMask = document.createElement("div");
     durationMask.className = "duration-mask time-legend-duration";
@@ -3177,13 +3196,11 @@ function makeSequenceRow(segment) {
     bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
     durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
 
-    var saveButton = document.createElement("button");
-    saveButton.type = "button";
-    saveButton.className = "time-legend-edit";
-    saveButton.textContent = "✓";
-    saveButton.setAttribute("aria-label", "Save time for " + segment.label);
-    saveButton.addEventListener("click", function () {
-      saveSequenceEntryEdit(segment.key, hoursInput, minutesInput, durationMask);
+    hoursInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") saveSequenceEntryEdit(segment.key, hoursInput, minutesInput, durationMask);
+    });
+    minutesInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") saveSequenceEntryEdit(segment.key, hoursInput, minutesInput, durationMask);
     });
 
     var cancelButton = document.createElement("button");
@@ -3196,7 +3213,7 @@ function makeSequenceRow(segment) {
       renderTimeSequenceList(state.selectedDate);
     });
 
-    item.append(swatch, label, durationMask, saveButton, cancelButton);
+    item.append(swatch, label, durationMask, cancelButton);
     return item;
   }
 
@@ -3253,7 +3270,8 @@ function removeTimeEntryById(dateKey, entryId) {
   }
 }
 
-function saveSequenceEntryEdit(entryId, hoursInput, minutesInput, durationMask) {
+function saveSequenceEntryEdit(entryId, hoursInput, minutesInput, durationMask, deferRender) {
+  if (!entryId || state.editingSequenceEntryId !== entryId) return;
   var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
   if (seconds <= 0) {
     durationMask.classList.add("is-invalid");
@@ -3263,7 +3281,13 @@ function saveSequenceEntryEdit(entryId, hoursInput, minutesInput, durationMask) 
   updateTimeEntrySeconds(state.selectedDate, entryId, seconds);
   state.editingSequenceEntryId = null;
   saveData();
-  renderTimePie();
+  if (deferRender) {
+    // Let the click that triggered this land first (e.g. the edit button of
+    // another row), then re-render.
+    setTimeout(renderTimePie, 0);
+  } else {
+    renderTimePie();
+  }
 }
 
 function deleteSequenceEntry(entryId) {
@@ -3290,6 +3314,10 @@ function setTimeChartMode(mode) {
   state.timeChartMode = mode;
   state.editingSequenceEntryId = null;
   state.historyAddOpen = false;
+  if (timeSequenceOutsideHandler) {
+    document.removeEventListener("mousedown", timeSequenceOutsideHandler);
+    timeSequenceOutsideHandler = null;
+  }
   els.timeChartArea.hidden = mode !== "merged";
   els.timerControls.hidden = mode !== "merged";
   els.timerSession.hidden = mode !== "merged";
