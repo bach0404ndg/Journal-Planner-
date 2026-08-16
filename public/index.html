@@ -32,7 +32,7 @@
       </div>
 
       <section class="view is-active" id="calendarView" aria-label="Calendar">
-        <div class="calendar-layout">
+        <div class="calendar-layout" id="calendarLayout">
           <aside class="side-panel" aria-label="Calendar task editor">
             <div class="side-panel-split">
               <div class="side-panel-main">
@@ -56,25 +56,45 @@
                   <button class="ghost-button" type="button" id="todayButton">Today</button>
                   <button class="cleanup-button" type="button" id="calendarRemoveOldDataButton">Remove old data</button>
                 </div>
-                <div class="emoji-section" aria-label="Day emoji markers">
+                <div class="emoji-section" id="emojiSection" aria-label="Day emoji markers">
                   <div class="emoji-palette" id="emojiPalette"></div>
+                  <button class="display-switch emoji-display-switch" id="emojiToggle" type="button" aria-label="Hide emoji markers" aria-pressed="true"></button>
                 </div>
                 <div class="side-panel-tasks">
-                  <form id="calendarNoteForm" class="stacked-form">
-                    <div class="special-task-shelf" aria-label="Special calendar tasks">
-                      <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
-                      <div class="special-task-list" id="specialTaskList"></div>
+                  <div class="stacked-form">
+                    <div class="special-task-shelf" id="specialTaskShelf" aria-label="Special calendar tasks">
+                      <div class="special-task-shelf-content">
+                        <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
+                        <div class="special-task-list" id="specialTaskList"></div>
+                      </div>
+                      <button class="display-switch special-task-display-switch" id="specialTaskToggle" type="button" aria-label="Hide special tasks" aria-pressed="true"></button>
                     </div>
-                    <label>
-                      <span>Task</span>
-                      <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
-                    </label>
-                  </form>
-                  <div class="mini-list" id="selectedDateNotes"></div>
+                  </div>
+                  <div class="task-stack">
+                    <section class="task-column dated-task-panel" aria-label="Selected day tasks">
+                      <form id="calendarNoteForm" class="task-entry-form">
+                        <label>
+                          <span>Task</span>
+                          <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+                        </label>
+                      </form>
+                      <div class="mini-list" id="selectedDateNotes"></div>
+                    </section>
+                    <section class="task-column info-dump-panel" aria-label="Info Dump">
+                      <form id="infoDumpForm" class="task-entry-form">
+                        <label>
+                          <span>Info Dump</span>
+                          <input id="infoDumpInput" type="text" placeholder="Add and press Enter">
+                        </label>
+                      </form>
+                      <div class="mini-list info-dump-list" id="infoDumpList"></div>
+                    </section>
+                  </div>
                 </div>
               </div>
 
-              <section class="time-panel" aria-label="Time tracking">
+              <section class="time-panel" id="timePanel" aria-label="Time tracking">
+                <button class="panel-collapse-toggle time-panel-toggle" id="timePanelToggle" type="button" aria-label="Close timer">‹</button>
                 <div class="time-panel-head">
                   <h2 class="time-panel-title">Time Tracker</h2>
                   <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
@@ -138,13 +158,17 @@
             </div>
           </aside>
 
-          <section class="calendar-panel" aria-label="Monthly calendar">
+          <section class="calendar-panel" id="calendarPanel" aria-label="Monthly calendar">
+            <button class="panel-collapse-toggle calendar-panel-toggle" id="calendarPanelToggle" type="button" aria-label="Close calendar">⌃</button>
             <div class="calendar-panel-top">
               <div class="range-switch" aria-label="Calendar range">
                 <button class="range-button" type="button" data-range="month">Monthly</button>
                 <button class="range-button is-active" type="button" data-range="week">Weekly</button>
               </div>
-              <div class="special-task-tracker" id="specialTaskTracker" aria-label="Special task counts"></div>
+              <div class="special-task-tracker-area" id="specialTaskTrackerArea">
+                <button class="display-switch special-task-tracker-toggle" id="specialTaskTrackerToggle" type="button" aria-label="Hide task counts" aria-pressed="true"></button>
+                <div class="special-task-tracker" id="specialTaskTracker" aria-label="Special task counts"></div>
+              </div>
               <div class="calendar-nav-buttons" aria-label="Calendar navigation">
                 <button class="metadata-button calendar-arrow-button" type="button" id="calendarPrevButton" aria-label="Previous calendar range">&lt;</button>
                 <button class="metadata-button calendar-arrow-button" type="button" id="calendarNextButton" aria-label="Next calendar range">&gt;</button>

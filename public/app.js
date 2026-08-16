@@ -1,4 +1,5 @@
 const STORAGE_KEY = "monthly-planner-journal-v1";
+const TIMER_STORAGE_KEY = "monthly-planner-journal-active-timer-v1";
 
 const monthNames = [
   "January",
@@ -135,10 +136,15 @@ const state = {
 };
 
 const els = {
+  calendarLayout: document.querySelector("#calendarLayout"),
+  calendarPanel: document.querySelector("#calendarPanel"),
+  calendarPanelToggle: document.querySelector("#calendarPanelToggle"),
   monthSelect: document.querySelector("#monthSelect"),
   yearInput: document.querySelector("#yearInput"),
   weekdayRow: document.querySelector("#weekdayRow"),
   calendarGrid: document.querySelector("#calendarGrid"),
+  specialTaskTrackerArea: document.querySelector("#specialTaskTrackerArea"),
+  specialTaskTrackerToggle: document.querySelector("#specialTaskTrackerToggle"),
   specialTaskTracker: document.querySelector("#specialTaskTracker"),
   selectedDateInput: document.querySelector("#selectedDateInput"),
   selectedDatePicker: document.querySelector("#selectedDatePicker"),
@@ -146,8 +152,15 @@ const els = {
   calendarRemoveOldDataButton: document.querySelector("#calendarRemoveOldDataButton"),
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
+  infoDumpForm: document.querySelector("#infoDumpForm"),
+  infoDumpInput: document.querySelector("#infoDumpInput"),
+  infoDumpList: document.querySelector("#infoDumpList"),
+  specialTaskShelf: document.querySelector("#specialTaskShelf"),
+  specialTaskToggle: document.querySelector("#specialTaskToggle"),
   addSpecialTaskButton: document.querySelector("#addSpecialTaskButton"),
   specialTaskList: document.querySelector("#specialTaskList"),
+  emojiSection: document.querySelector("#emojiSection"),
+  emojiToggle: document.querySelector("#emojiToggle"),
   emojiPalette: document.querySelector("#emojiPalette"),
   paletteMenu: document.querySelector("#paletteMenu"),
   paletteOptions: document.querySelector("#paletteOptions"),
@@ -188,6 +201,8 @@ const els = {
   removeOldDataButton: document.querySelector("#removeOldDataButton"),
 
   clearTimeEntriesButton: document.querySelector("#clearTimeEntriesButton"),
+  timePanel: document.querySelector("#timePanel"),
+  timePanelToggle: document.querySelector("#timePanelToggle"),
   timePieChart: document.querySelector("#timePieChart"),
   timePieSlices: document.querySelector("#timePieSlices"),
   timeChartTotal: document.querySelector("#timeChartTotal"),
@@ -230,6 +245,7 @@ function loadData() {
         trackedSpecialTaskIds: normalizeTrackedSpecialTaskIds(saved.trackedSpecialTaskIds, savedCalendarTasks),
         hiddenAllSpecialTaskCounterIds: normalizeTrackedSpecialTaskIds(saved.hiddenAllSpecialTaskCounterIds, savedCalendarTasks),
         showAllSpecialTaskCounters: Boolean(saved.showAllSpecialTaskCounters),
+        infoDumpTasks: normalizeInfoDumpTasks(saved.infoDumpTasks),
         dayEmojis: saved.dayEmojis || {},
         goalSections,
         goalGroups,
@@ -238,6 +254,11 @@ function loadData() {
         journalEntries: saved.journalEntries || [],
         palette: normalizePalette(saved.palette),
         journalEntryCollapsed: Boolean(saved.journalEntryCollapsed),
+        emojiCollapsed: Boolean(saved.emojiCollapsed),
+        specialTasksCollapsed: Boolean(saved.specialTasksCollapsed),
+        specialTaskTrackerCollapsed: Boolean(saved.specialTaskTrackerCollapsed),
+        calendarPanelCollapsed: Boolean(saved.calendarPanelCollapsed),
+        timePanelCollapsed: Boolean(saved.timePanelCollapsed),
         journalLogWidth: normalizeJournalLogWidth(saved.journalLogWidth),
         timeEntries: normalizeTimeEntries(saved.timeEntries),
       };
@@ -252,6 +273,7 @@ function loadData() {
     trackedSpecialTaskIds: [],
     hiddenAllSpecialTaskCounterIds: [],
     showAllSpecialTaskCounters: false,
+    infoDumpTasks: [],
     dayEmojis: {},
     goalSections: [],
     goalGroups: [{ id: makeId("goal-group"), title: defaultGoalGroupName, sections: [] }],
@@ -260,6 +282,11 @@ function loadData() {
     journalEntries: [],
     palette: "green",
     journalEntryCollapsed: false,
+    emojiCollapsed: false,
+    specialTasksCollapsed: false,
+    specialTaskTrackerCollapsed: false,
+    calendarPanelCollapsed: false,
+    timePanelCollapsed: false,
     journalLogWidth: 58,
     timeEntries: {},
   };
@@ -268,6 +295,81 @@ function loadData() {
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
   updateUndoButton();
+}
+
+function serializableTimerState() {
+  return {
+    status: state.timer.status,
+    dateKey: state.timer.dateKey,
+    taskId: state.timer.taskId,
+    subtaskId: state.timer.subtaskId,
+    taskText: state.timer.taskText,
+    color: state.timer.color,
+    subtaskText: state.timer.subtaskText,
+    durationSeconds: state.timer.durationSeconds,
+    accumulatedSeconds: state.timer.accumulatedSeconds,
+    sessionStartEpoch: state.timer.sessionStartEpoch,
+    sessionStartedAt: state.timer.sessionStartedAt,
+    lastDisplayedSecond: state.timer.lastDisplayedSecond,
+    confirmStop: state.timer.confirmStop,
+  };
+}
+
+function persistTimerState() {
+  if (!state.timer || state.timer.status === "idle") {
+    localStorage.removeItem(TIMER_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(serializableTimerState()));
+}
+
+function clearPersistedTimerState() {
+  localStorage.removeItem(TIMER_STORAGE_KEY);
+}
+
+function normalizePersistedTimer(timer) {
+  if (!timer || typeof timer !== "object") return null;
+  if (!["running", "paused", "finished"].includes(timer.status)) return null;
+
+  return {
+    status: timer.status,
+    dateKey: normalizeDateInput(timer.dateKey) || currentDateKey(),
+    taskId: String(timer.taskId || ""),
+    subtaskId: String(timer.subtaskId || ""),
+    taskText: String(timer.taskText || ""),
+    color: normalizeCalendarTaskColor(timer.color),
+    subtaskText: String(timer.subtaskText || ""),
+    durationSeconds: Math.max(0, Math.floor(Number(timer.durationSeconds) || 0)),
+    accumulatedSeconds: Math.max(0, Math.floor(Number(timer.accumulatedSeconds) || 0)),
+    sessionStartEpoch: Number(timer.sessionStartEpoch) || null,
+    sessionStartedAt: String(timer.sessionStartedAt || ""),
+    lastDisplayedSecond: -1,
+    confirmStop: false,
+  };
+}
+
+function restorePersistedTimerState() {
+  try {
+    const restored = normalizePersistedTimer(JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY)));
+    if (!restored) return;
+
+    Object.assign(state.timer, restored);
+    if (state.timer.status === "running" && !state.timer.sessionStartEpoch) {
+      state.timer.status = "paused";
+    }
+    if (state.timer.status === "running" && liveRemainingSeconds() <= 0) {
+      state.timer.status = "finished";
+      state.timer.accumulatedSeconds = state.timer.durationSeconds;
+      state.timer.sessionStartEpoch = null;
+    }
+    if (state.timer.status === "running") {
+      state.timer.tickHandle = window.setInterval(tickTimer, 250);
+    }
+    persistTimerState();
+  } catch (error) {
+    console.warn("Timer state could not be restored.", error);
+    clearPersistedTimerState();
+  }
 }
 
 function cloneData(data) {
@@ -376,6 +478,17 @@ function normalizeCalendarNotes(savedNotes) {
       Array.isArray(notes) ? notes.map(normalizeTask) : [],
     ]),
   );
+}
+
+function normalizeInfoDumpTasks(savedTasks) {
+  if (!Array.isArray(savedTasks)) return [];
+  return savedTasks
+    .map((task) => ({
+      id: task.id || makeId("info"),
+      text: String(task.text || "").trim(),
+      done: Boolean(task.done),
+    }))
+    .filter((task) => task.text);
 }
 
 function normalizeSavedCalendarTasks(savedTasks) {
@@ -718,6 +831,8 @@ function init() {
   renderPaletteOptions();
   renderSpecialTasks();
   applyJournalLayout();
+  applyPlannerPanelLayout();
+  restorePersistedTimerState();
 
   bindEvents();
   ensureStarterSections();
@@ -800,6 +915,26 @@ function bindEvents() {
 
   els.calendarNextButton.addEventListener("click", () => {
     shiftCalendarRange(1);
+  });
+
+  els.specialTaskTrackerToggle.addEventListener("click", () => {
+    togglePlannerPanel("specialTaskTrackerCollapsed", "task count");
+  });
+
+  els.emojiToggle.addEventListener("click", () => {
+    togglePlannerPanel("emojiCollapsed", "emoji markers");
+  });
+
+  els.specialTaskToggle.addEventListener("click", () => {
+    togglePlannerPanel("specialTasksCollapsed", "special tasks");
+  });
+
+  els.calendarPanelToggle.addEventListener("click", () => {
+    togglePlannerPanel("calendarPanelCollapsed", "calendar");
+  });
+
+  els.timePanelToggle.addEventListener("click", () => {
+    togglePlannerPanel("timePanelCollapsed", "timer");
   });
 
   els.journalEntryToggle.addEventListener("click", () => {
@@ -896,6 +1031,22 @@ function bindEvents() {
     renderSelectedDateNotes();
   });
 
+  els.infoDumpForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const text = els.infoDumpInput.value.trim();
+    if (!text) return;
+
+    queueUndo("info dump task");
+    state.data.infoDumpTasks.push({
+      id: makeId("info"),
+      text,
+      done: false,
+    });
+    els.infoDumpInput.value = "";
+    saveData();
+    renderInfoDump();
+  });
+
   els.addSpecialTaskButton.addEventListener("click", () => {
     addSpecialTask();
   });
@@ -918,12 +1069,7 @@ function bindEvents() {
   els.timeChartModeSequenceButton.addEventListener("click", function () {
     setTimeChartMode("sequence");
   });
-  window.addEventListener("beforeunload", (event) => {
-    if (state.timer.status === "running" || state.timer.status === "paused") {
-      event.preventDefault();
-      event.returnValue = "";
-    }
-  });
+  window.addEventListener("pagehide", persistTimerState);
 
   els.journalForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1139,6 +1285,14 @@ function getCalendarTaskColor(colorId) {
 
 function renderSpecialTasks() {
   els.specialTaskList.innerHTML = "";
+
+  if (!state.data.savedCalendarTasks.length) {
+    const empty = document.createElement("span");
+    empty.className = "special-task-empty-message";
+    empty.textContent = "No special task created";
+    els.specialTaskList.append(empty);
+    return;
+  }
 
   state.data.savedCalendarTasks.forEach((task) => {
     els.specialTaskList.append(makeSpecialTaskChip(task));
@@ -1419,6 +1573,43 @@ function removeSpecialTask(taskId) {
   renderCalendar();
 }
 
+function togglePlannerPanel(key, label) {
+  queueUndo(`${label} layout change`);
+  state.data[key] = !state.data[key];
+  saveData();
+  applyPlannerPanelLayout();
+}
+
+function applyPlannerPanelLayout() {
+  const emojiCollapsed = Boolean(state.data.emojiCollapsed);
+  const specialCollapsed = Boolean(state.data.specialTasksCollapsed);
+  const taskCountCollapsed = Boolean(state.data.specialTaskTrackerCollapsed);
+  const calendarCollapsed = Boolean(state.data.calendarPanelCollapsed);
+  const timerCollapsed = Boolean(state.data.timePanelCollapsed);
+
+  els.calendarLayout.dataset.calendarCollapsed = calendarCollapsed ? "true" : "false";
+  els.emojiSection.dataset.panelCollapsed = emojiCollapsed ? "true" : "false";
+  els.specialTaskShelf.dataset.panelCollapsed = specialCollapsed ? "true" : "false";
+  els.specialTaskTrackerArea.dataset.panelCollapsed = taskCountCollapsed ? "true" : "false";
+  els.timePanel.dataset.panelCollapsed = timerCollapsed ? "true" : "false";
+  els.calendarPanel.dataset.panelCollapsed = calendarCollapsed ? "true" : "false";
+
+  els.timePanelToggle.textContent = timerCollapsed ? "‹" : "›";
+  els.calendarPanelToggle.textContent = calendarCollapsed ? "⌄" : "⌃";
+
+  els.emojiToggle.dataset.switchOn = emojiCollapsed ? "false" : "true";
+  els.specialTaskToggle.dataset.switchOn = specialCollapsed ? "false" : "true";
+  els.specialTaskTrackerToggle.dataset.switchOn = taskCountCollapsed ? "false" : "true";
+  els.emojiToggle.setAttribute("aria-pressed", emojiCollapsed ? "false" : "true");
+  els.specialTaskToggle.setAttribute("aria-pressed", specialCollapsed ? "false" : "true");
+  els.specialTaskTrackerToggle.setAttribute("aria-pressed", taskCountCollapsed ? "false" : "true");
+  els.emojiToggle.setAttribute("aria-label", emojiCollapsed ? "Show emoji markers" : "Hide emoji markers");
+  els.specialTaskToggle.setAttribute("aria-label", specialCollapsed ? "Show special tasks" : "Hide special tasks");
+  els.specialTaskTrackerToggle.setAttribute("aria-label", taskCountCollapsed ? "Show task counts" : "Hide task counts");
+  els.timePanelToggle.setAttribute("aria-label", timerCollapsed ? "Open timer" : "Close timer");
+  els.calendarPanelToggle.setAttribute("aria-label", calendarCollapsed ? "Open calendar" : "Close calendar");
+}
+
 function applyJournalLayout() {
   const logWidth = normalizeJournalLogWidth(state.data.journalLogWidth);
   els.journalLayout.dataset.entryCollapsed = state.data.journalEntryCollapsed ? "true" : "false";
@@ -1684,7 +1875,9 @@ function clearGoalGroupDrag() {
 
 function renderAll() {
   ensureStarterSections();
+  applyPlannerPanelLayout();
   renderSpecialTasks();
+  renderInfoDump();
   renderCalendar();
   setTimePanelView(state.timePanelView);
   els.timeChartArea.hidden = state.timeChartMode !== "merged";
@@ -1906,6 +2099,13 @@ function renderSpecialTaskTracker(gridStart, totalDays) {
     item.append(label, number, removeButton);
     els.specialTaskTracker.append(item);
   });
+
+  if (!trackerTasks.length) {
+    const empty = document.createElement("span");
+    empty.className = "special-task-count-empty";
+    empty.textContent = "No task has been done";
+    els.specialTaskTracker.append(empty);
+  }
 }
 
 function makeSpecialTaskCounterAddMenu() {
@@ -2120,9 +2320,57 @@ function moveCalendarTask(sourceDateKey, noteId, targetDateKey) {
     state.data.calendarNotes[sourceDateKey] = sourceNotes;
   }
   state.data.calendarNotes[targetDateKey] = [...(state.data.calendarNotes[targetDateKey] || []), note];
+  moveTaskTimeEntries(sourceDateKey, targetDateKey, noteId);
+  if (state.timer.status !== "idle" && state.timer.dateKey === sourceDateKey && state.timer.taskId === noteId) {
+    state.timer.dateKey = targetDateKey;
+    state.timer.sessionStartedAt = shiftIsoDateToDateKey(state.timer.sessionStartedAt, targetDateKey);
+    persistTimerState();
+  }
   saveData();
   renderCalendar();
   renderSelectedDateNotes();
+}
+
+function shiftIsoDateToDateKey(iso, dateKey) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const parts = datePartsFromKey(dateKey);
+  if (Number.isNaN(date.getTime())) return iso;
+  date.setFullYear(parts.year, parts.month - 1, parts.day);
+  return date.toISOString();
+}
+
+function compareTimeEntriesByClock(a, b) {
+  const left = a.startedAt || a.endedAt || "";
+  const right = b.startedAt || b.endedAt || "";
+  if (left && right) return left.localeCompare(right);
+  if (left) return -1;
+  if (right) return 1;
+  return 0;
+}
+
+function moveTaskTimeEntries(sourceDateKey, targetDateKey, taskId) {
+  const sourceEntries = state.data.timeEntries[sourceDateKey] || [];
+  const movingEntries = sourceEntries
+    .filter((entry) => entry.taskId === taskId)
+    .map((entry) => ({
+      ...entry,
+      startedAt: shiftIsoDateToDateKey(entry.startedAt, targetDateKey),
+      endedAt: shiftIsoDateToDateKey(entry.endedAt, targetDateKey),
+    }));
+  if (!movingEntries.length) return;
+
+  const remainingEntries = sourceEntries.filter((entry) => entry.taskId !== taskId);
+  if (remainingEntries.length) {
+    state.data.timeEntries[sourceDateKey] = remainingEntries;
+  } else {
+    delete state.data.timeEntries[sourceDateKey];
+  }
+
+  state.data.timeEntries[targetDateKey] = [
+    ...(state.data.timeEntries[targetDateKey] || []),
+    ...movingEntries,
+  ].sort(compareTimeEntriesByClock);
 }
 
 function moveGoalTaskDate(sectionId, goalId, targetDateKey) {
@@ -2299,6 +2547,153 @@ function duplicateCalendarTask(dateKey, noteId) {
   if (dateKey === state.selectedDate) {
     renderSelectedDateNotes();
   }
+}
+
+function renderInfoDump() {
+  els.infoDumpList.innerHTML = "";
+
+  state.data.infoDumpTasks.forEach((task) => {
+    els.infoDumpList.append(makeInfoDumpRow(task));
+  });
+}
+
+function updateInfoDumpTaskText(taskId, text) {
+  const task = state.data.infoDumpTasks.find((item) => item.id === taskId);
+  if (!task) return;
+  const nextText = text.trim();
+  if (!nextText) {
+    deleteInfoDumpTask(taskId);
+    return;
+  }
+  if (task.text === nextText) return;
+  queueUndo("info dump edit");
+  task.text = nextText;
+  saveData();
+  renderInfoDump();
+}
+
+function updateInfoDumpTaskDone(taskId, done) {
+  const task = state.data.infoDumpTasks.find((item) => item.id === taskId);
+  if (!task || task.done === done) return;
+  queueUndo("info dump status");
+  task.done = done;
+  saveData();
+  renderInfoDump();
+}
+
+function deleteInfoDumpTask(taskId) {
+  if (!state.data.infoDumpTasks.some((task) => task.id === taskId)) return;
+  queueUndo("info dump deletion");
+  state.data.infoDumpTasks = state.data.infoDumpTasks.filter((task) => task.id !== taskId);
+  saveData();
+  renderInfoDump();
+}
+
+function moveInfoDumpTaskToCalendar(taskId, dateKey) {
+  const task = state.data.infoDumpTasks.find((item) => item.id === taskId);
+  const targetDateKey = normalizeDateInput(dateKey) || state.selectedDate || currentDateKey();
+  if (!task || !targetDateKey) return;
+
+  queueUndo("info dump move");
+  state.data.calendarNotes[targetDateKey] = [
+    ...(state.data.calendarNotes[targetDateKey] || []),
+    {
+      id: makeId("note"),
+      text: task.text,
+      done: Boolean(task.done),
+      color: "",
+      time: "",
+      subtasks: [],
+    },
+  ];
+  state.data.infoDumpTasks = state.data.infoDumpTasks.filter((item) => item.id !== taskId);
+  setCalendarDate(targetDateKey);
+  saveData();
+  renderInfoDump();
+  renderCalendar();
+  renderSelectedDateNotes();
+}
+
+function makeInfoDumpDateControl(task) {
+  const control = document.createElement("span");
+  control.className = "goal-date-picker-control info-dump-date-control";
+  control.addEventListener("click", (event) => event.stopPropagation());
+
+  const button = document.createElement("button");
+  button.className = "goal-date-button info-dump-date-button";
+  button.type = "button";
+  button.textContent = "◷";
+  button.title = "Move to calendar";
+  button.setAttribute("aria-label", "Move info dump task to calendar date");
+
+  const nativeDateInput = document.createElement("input");
+  nativeDateInput.className = "native-picker-input";
+  nativeDateInput.type = "date";
+  nativeDateInput.tabIndex = -1;
+  nativeDateInput.setAttribute("aria-hidden", "true");
+
+  button.addEventListener("click", () => {
+    nativeDateInput.value = "";
+    openNativePicker(nativeDateInput);
+  });
+  nativeDateInput.addEventListener("change", () => {
+    const nextDateKey = normalizeDateInput(nativeDateInput.value);
+    if (!nextDateKey) return;
+    moveInfoDumpTaskToCalendar(task.id, nextDateKey);
+  });
+
+  control.append(button, nativeDateInput);
+  return control;
+}
+
+function makeInfoDumpRow(task) {
+  const item = document.createElement("div");
+  item.className = "mini-item info-dump-item";
+  item.classList.toggle("is-done", Boolean(task.done));
+  item.dataset.infoDumpId = task.id;
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = Boolean(task.done);
+  checkbox.setAttribute("aria-label", "Mark info dump task complete");
+  checkbox.addEventListener("change", () => {
+    updateInfoDumpTaskDone(task.id, checkbox.checked);
+  });
+
+  const text = document.createElement("textarea");
+  text.className = "goal-text-input info-dump-text-input";
+  text.rows = 1;
+  text.value = task.text;
+  text.setAttribute("aria-label", "Edit info dump task");
+  text.addEventListener("input", () => {
+    resizeWrappingTextboxSoon(text);
+  });
+  text.addEventListener("change", () => {
+    updateInfoDumpTaskText(task.id, text.value);
+  });
+  text.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      text.blur();
+    }
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "goal-item-actions info-dump-actions";
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.textContent = "x";
+  deleteButton.className = "goal-delete-button";
+  deleteButton.setAttribute("aria-label", "Delete info dump task");
+  deleteButton.addEventListener("click", () => {
+    deleteInfoDumpTask(task.id);
+  });
+
+  actions.append(makeInfoDumpDateControl(task), deleteButton);
+  item.append(checkbox, text, actions);
+  resizeWrappingTextboxSoon(text);
+  return item;
 }
 
 function makeTaskDuplicateButton(dateKey, noteId, customDuplicate) {
@@ -2626,8 +3021,8 @@ function writeDurationMaskSeconds(hoursInput, minutesInput, totalSeconds) {
     minutes = 0;
     hours += 1;
   }
-  hoursInput.value = String(hours).padStart(2, "0");
-  minutesInput.value = String(minutes).padStart(2, "0");
+  hoursInput.value = String(hours);
+  minutesInput.value = String(minutes);
 }
 
 function sanitizeDurationMaskInput(input, max) {
@@ -2642,7 +3037,7 @@ function bindDurationMaskInput(input, max, onChange) {
     if (onChange) onChange();
   });
   input.addEventListener("blur", function () {
-    input.value = String(Math.max(0, parseInt(input.value, 10) || 0)).padStart(2, "0");
+    input.value = String(Math.max(0, parseInt(input.value, 10) || 0));
   });
 }
 
@@ -2729,6 +3124,7 @@ function startTimer() {
   }
 
   state.timer.tickHandle = window.setInterval(tickTimer, 250);
+  persistTimerState();
   renderTimerControls();
   renderTimerDisplay();
   renderTimePie();
@@ -2740,6 +3136,7 @@ function pauseTimer() {
   state.timer.sessionStartEpoch = null;
   state.timer.status = "paused";
   stopTick();
+  persistTimerState();
   renderTimerControls();
   renderTimerDisplay();
   renderTimePie();
@@ -2762,6 +3159,7 @@ function finishTimer() {
   state.timer.sessionStartEpoch = null;
   playAlarm();
   els.timerDisplay.classList.add("is-alarm");
+  persistTimerState();
   renderTimerControls();
   renderTimerDisplay();
   renderTimePie();
@@ -2775,6 +3173,7 @@ function continueTimer() {
   els.timerDisplay.classList.remove("is-alarm");
   stopAlarm();
   state.timer.tickHandle = window.setInterval(tickTimer, 250);
+  persistTimerState();
   renderTimerControls();
   renderTimerDisplay();
   renderTimePie();
@@ -2784,6 +3183,7 @@ function adjustTimerDuration(deltaSeconds) {
   if (state.timer.status !== "running" && state.timer.status !== "paused") return;
   var elapsed = liveElapsedSeconds();
   state.timer.durationSeconds = Math.max(elapsed, state.timer.durationSeconds + deltaSeconds);
+  persistTimerState();
   renderTimerDisplay();
 }
 
@@ -2796,6 +3196,7 @@ function confirmStopTimer() {
   }
   if (state.timer.status === "running") pauseTimer();
   state.timer.confirmStop = true;
+  persistTimerState();
   renderTimerControls();
 }
 
@@ -2806,6 +3207,7 @@ function cancelStopConfirm() {
     state.timer.sessionStartEpoch = Date.now();
     state.timer.tickHandle = window.setInterval(tickTimer, 250);
   }
+  persistTimerState();
   renderTimerControls();
   renderTimerDisplay();
 }
@@ -2855,6 +3257,7 @@ function stopTimer(save) {
   state.timer.sessionStartedAt = null;
   state.timer.lastDisplayedSecond = -1;
   state.timer.confirmStop = false;
+  clearPersistedTimerState();
   renderTimerControls();
   renderTimerDisplay();
   renderTimePie();
@@ -3083,8 +3486,8 @@ function makeHistoryAddRow() {
     var minutesUnit = document.createElement("span");
     minutesUnit.className = "duration-mask-unit";
     minutesUnit.textContent = "m";
-    hoursInput.value = "00";
-    minutesInput.value = "00";
+    hoursInput.value = "0";
+    minutesInput.value = "0";
     bindDurationMaskInput(hoursInput, 99, function () { durationMask.classList.remove("is-invalid"); });
     bindDurationMaskInput(minutesInput, 59, function () { durationMask.classList.remove("is-invalid"); });
     durationMask.append(hoursInput, hoursUnit, minutesInput, minutesUnit);
@@ -3300,6 +3703,7 @@ function deleteSequenceEntry(entryId) {
 function renderTimePie() {
   var buckets = getDayTimeBuckets(state.selectedDate);
   var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
+  els.timePanel.dataset.legendDensity = buckets.length <= 2 ? "sparse" : buckets.length <= 4 ? "medium" : "full";
 
   if (state.timeChartMode === "sequence") {
     renderTimeSequenceList(state.selectedDate);
@@ -4109,7 +4513,7 @@ function renderGoalItem(section, goal) {
   const dateButton = document.createElement("button");
   dateButton.className = "goal-date-button";
   dateButton.type = "button";
-  dateButton.textContent = "▦";
+  dateButton.textContent = "◷";
   dateButton.title = goal.dueDate ? `Date: ${goal.dueDate}` : "Set date";
   dateButton.setAttribute("aria-label", "Set goal calendar date");
 
@@ -4134,6 +4538,10 @@ function renderGoalItem(section, goal) {
 
   dateButton.addEventListener("click", () => {
     const nextDateKey = goal.dueDate || currentDateKey();
+    if (!goal.dueDate) {
+      applyGoalDate(nextDateKey);
+      return;
+    }
     nativeDateInput.value = nextDateKey;
     openNativePicker(nativeDateInput);
   });

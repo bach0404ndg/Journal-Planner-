@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your Journal</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="journal-site">
+    <main class="app-shell journal-site-shell">
+      <header class="topbar journal-site-topbar">
+        <div>
+          <h1>YOUR JOURNAL</h1>
+        </div>
+        <div class="section-meta-controls">
+          <button class="undo-button" type="button" id="undoButton" disabled>Undo</button>
+          <details class="palette-control color-menu" id="paletteMenu">
+            <summary aria-label="Choose journal color">
+              <span class="color-menu-current" aria-hidden="true"></span>
+            </summary>
+            <div class="color-menu-items" id="paletteOptions"></div>
+          </details>
+          <a class="metadata-button journal-planner-link" href="./">Planner</a>
+        </div>
+      </header>
+
+      <section class="view is-active journal-site-view" aria-label="Journal">
+        <div class="journal-layout" id="journalLayout">
+          <form id="journalForm" class="journal-form" aria-label="New journal entry">
+            <button class="entry-panel-toggle" id="journalEntryToggle" type="button" aria-label="Close entry box">‹</button>
+            <div class="journal-meta">
+              <label>
+                <span>City</span>
+                <input id="journalCity" type="text" placeholder="Hanoi">
+              </label>
+              <label>
+                <span>Date</span>
+                <div class="picker-input-row">
+                  <input id="journalDate" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
+                  <button class="picker-open-button" id="journalDatePickerButton" type="button" aria-label="Open date picker">▦</button>
+                  <input class="native-picker-input" id="journalDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                </div>
+              </label>
+              <label>
+                <span>Time</span>
+                <input id="journalTime" type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm">
+              </label>
+            </div>
+            <div class="journal-label-row">
+              <label>
+                <span>Label</span>
+                <select id="journalLabel"></select>
+              </label>
+              <details class="entry-menu label-menu">
+                <summary aria-label="Label options">...</summary>
+                <div class="entry-menu-items">
+                  <button id="addJournalLabelButton" type="button">Add label</button>
+                  <button class="danger-text" id="removeJournalLabelButton" type="button">Remove label</button>
+                </div>
+              </details>
+            </div>
+            <label>
+              <span>Entry</span>
+              <textarea id="journalText" rows="10"></textarea>
+            </label>
+            <div class="journal-form-actions">
+              <button class="primary-button" id="journalSubmitButton" type="submit">Save entry</button>
+              <button class="ghost-button" id="cancelJournalEditButton" type="button" hidden>Cancel edit</button>
+            </div>
+          </form>
+
+          <div class="journal-resize-handle" id="journalResizeHandle" role="separator" aria-label="Resize saved journal" aria-orientation="vertical"></div>
+
+          <aside class="log-panel" aria-label="Saved journal entries">
+            <div class="log-head">
+              <div class="journal-filter-controls">
+                <label>
+                  <span>Date</span>
+                  <div class="picker-input-row">
+                    <input id="journalFilterDate" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
+                    <button class="picker-open-button" id="journalFilterDatePickerButton" type="button" aria-label="Open saved journal date picker">▦</button>
+                    <input class="native-picker-input" id="journalFilterDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                  </div>
+                </label>
+                <label>
+                  <span>Month</span>
+                  <select id="journalFilterMonth"></select>
+                </label>
+                <label>
+                  <span>Year</span>
+                  <input id="journalFilterYear" type="number" min="1970" max="2099" inputmode="numeric">
+                </label>
+                <label>
+                  <span>Label</span>
+                  <select id="journalFilterLabel"></select>
+                </label>
+                <button class="metadata-button" type="button" id="resetJournalFiltersButton">Reset</button>
+                <button class="cleanup-button" type="button" id="removeOldJournalDataButton">Remove old data</button>
+              </div>
+            </div>
+            <div class="journal-log" id="journalLog"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="journal.js"></script>
+  </body>
+</html>
