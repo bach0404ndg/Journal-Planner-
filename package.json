@@ -1,6 +1,7 @@
 {
   "scripts": {
     "dev": "wrangler pages dev public",
+    "build:journal": "node scripts/build-journal.mjs",
     "deploy": "wrangler pages deploy public --project-name journal-project"
   },
   "devDependencies": {

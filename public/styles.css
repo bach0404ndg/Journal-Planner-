@@ -2610,7 +2610,7 @@ textarea:focus {
 
 .journal-filter-controls {
   display: grid;
-  grid-template-columns: max-content 120px 82px 130px auto max-content;
+  grid-template-columns: max-content 120px 82px 130px repeat(4, max-content);
   width: fit-content;
   max-width: 100%;
 }

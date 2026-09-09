@@ -198,6 +198,8 @@ const els = {
   journalFilterYear: document.querySelector("#journalFilterYear"),
   journalFilterLabel: document.querySelector("#journalFilterLabel"),
   resetJournalFiltersButton: document.querySelector("#resetJournalFiltersButton"),
+  exportJournalBackupButton: document.querySelector("#exportJournalBackupButton"),
+  importJournalBackupButton: document.querySelector("#importJournalBackupButton"),
   removeOldDataButton: document.querySelector("#removeOldDataButton"),
 
   clearTimeEntriesButton: document.querySelector("#clearTimeEntriesButton"),
@@ -251,7 +253,7 @@ function loadData() {
         goalGroups,
         activeGoalGroupId: normalizeActiveGoalGroupId(saved.activeGoalGroupId, goalGroups),
         journalLabels: normalizeJournalLabels(saved.journalLabels, saved.journalEntries),
-        journalEntries: saved.journalEntries || [],
+        journalEntries: normalizeJournalEntryList(saved.journalEntries),
         palette: normalizePalette(saved.palette),
         journalEntryCollapsed: Boolean(saved.journalEntryCollapsed),
         emojiCollapsed: Boolean(saved.emojiCollapsed),
@@ -761,6 +763,33 @@ function normalizeJournalLabels(savedLabels, entries = []) {
   return [...new Set([...labels, ...entryLabels])].sort((a, b) => a.localeCompare(b));
 }
 
+function normalizeJournalEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const text = typeof entry.text === "string" ? entry.text.trim() : "";
+  if (!text) return null;
+  const label = typeof entry.label === "string" ? entry.label.trim() : getEntryLabel(entry).trim();
+  return {
+    id: typeof entry.id === "string" && entry.id ? entry.id : makeId("journal"),
+    city: typeof entry.city === "string" ? entry.city.trim() : "",
+    date: normalizeDateInput(entry.date) || "",
+    time: normalizeTimeValue(entry.time) || "",
+    label,
+    tags: label ? [label] : [],
+    text,
+    createdAt: typeof entry.createdAt === "string" && entry.createdAt ? entry.createdAt : new Date().toISOString(),
+    updatedAt: typeof entry.updatedAt === "string" ? entry.updatedAt : "",
+  };
+}
+
+function normalizeJournalEntryList(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries.map(normalizeJournalEntry).filter(Boolean);
+}
+
+function journalEntrySignature(entry) {
+  return [entry.city || "", entry.date || "", entry.time || "", getEntryLabel(entry), entry.text || ""].join("\u0000");
+}
+
 function normalizePalette(savedPalette) {
   return paletteOptions.some((palette) => palette.id === savedPalette) ? savedPalette : "green";
 }
@@ -1209,6 +1238,9 @@ function bindEvents() {
     els.journalFilterLabel.value = "";
     renderJournal();
   });
+
+  els.exportJournalBackupButton.addEventListener("click", exportJournalBackup);
+  els.importJournalBackupButton.addEventListener("click", importJournalBackup);
 
   els.calendarRemoveOldDataButton.addEventListener("click", () => {
     removeOldData();
@@ -1961,6 +1993,84 @@ function removeOldData() {
     before.datedGoals -
     after.datedGoals;
   window.alert("Removed " + removed + " old saved item" + (removed === 1 ? "" : "s") + ".");
+}
+
+function exportJournalBackup() {
+  const backup = {
+    type: "your-planner-journal-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    journalLabels: state.data.journalLabels,
+    journalEntries: state.data.journalEntries,
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `journal-backup-${currentDateKey()}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importJournalBackup() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      try {
+        const result = mergeJournalBackup(String(reader.result || ""));
+        window.alert(
+          `Loaded ${result.addedEntries} ${result.addedEntries === 1 ? "entry" : "entries"} and ${result.addedLabels} ${result.addedLabels === 1 ? "label" : "labels"}.`,
+        );
+      } catch (error) {
+        window.alert("That backup file could not be loaded.");
+      }
+    });
+    reader.readAsText(file);
+  });
+  input.click();
+}
+
+function mergeJournalBackup(rawBackup) {
+  const parsed = JSON.parse(rawBackup);
+  const backupEntries = Array.isArray(parsed) ? parsed : parsed.journalEntries;
+  const backupLabels = Array.isArray(parsed) ? [] : parsed.journalLabels;
+  const entries = normalizeJournalEntryList(backupEntries);
+  if (!entries.length && !Array.isArray(backupLabels)) {
+    throw new Error("Backup does not contain journal data.");
+  }
+
+  queueUndo("journal backup import");
+  const existingIds = new Set(state.data.journalEntries.map((entry) => entry.id));
+  const existingSignatures = new Set(state.data.journalEntries.map(journalEntrySignature));
+  let addedEntries = 0;
+
+  entries.forEach((entry) => {
+    const signature = journalEntrySignature(entry);
+    if (existingIds.has(entry.id) || existingSignatures.has(signature)) return;
+    state.data.journalEntries.push(entry);
+    existingIds.add(entry.id);
+    existingSignatures.add(signature);
+    addedEntries += 1;
+  });
+
+  const previousLabelCount = state.data.journalLabels.length;
+  state.data.journalLabels = normalizeJournalLabels(
+    [...state.data.journalLabels, ...(Array.isArray(backupLabels) ? backupLabels : [])],
+    state.data.journalEntries,
+  );
+  const addedLabels = state.data.journalLabels.length - previousLabelCount;
+
+  saveData();
+  renderJournalLabelOptions();
+  renderJournal();
+  return { addedEntries, addedLabels };
 }
 
 function renderCalendar() {
