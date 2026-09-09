@@ -2758,9 +2758,13 @@ function makeInfoDumpDateControl(task) {
 
 function makeInfoDumpRow(task) {
   const item = document.createElement("div");
-  item.className = "mini-item info-dump-item";
+  item.className = "mini-item calendar-task info-dump-item";
   item.classList.toggle("is-done", Boolean(task.done));
   item.dataset.infoDumpId = task.id;
+
+  const handleSpacer = document.createElement("span");
+  handleSpacer.className = "task-drag-handle info-dump-handle-spacer";
+  handleSpacer.setAttribute("aria-hidden", "true");
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -2771,7 +2775,7 @@ function makeInfoDumpRow(task) {
   });
 
   const text = document.createElement("textarea");
-  text.className = "goal-text-input info-dump-text-input";
+  text.className = "task-text-input info-dump-text-input";
   text.rows = 1;
   text.value = task.text;
   text.setAttribute("aria-label", "Edit info dump task");
@@ -2789,19 +2793,23 @@ function makeInfoDumpRow(task) {
   });
 
   const actions = document.createElement("div");
-  actions.className = "goal-item-actions info-dump-actions";
+  actions.className = "calendar-task-actions info-dump-actions";
 
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
   deleteButton.textContent = "x";
-  deleteButton.className = "goal-delete-button";
+  deleteButton.className = "task-delete-button";
   deleteButton.setAttribute("aria-label", "Delete info dump task");
   deleteButton.addEventListener("click", () => {
     deleteInfoDumpTask(task.id);
   });
 
+  const textWrap = document.createElement("div");
+  textWrap.className = "task-text-wrap";
+  textWrap.append(text);
+
   actions.append(makeInfoDumpDateControl(task), deleteButton);
-  item.append(checkbox, text, actions);
+  item.append(handleSpacer, checkbox, textWrap, actions);
   resizeWrappingTextboxSoon(text);
   return item;
 }

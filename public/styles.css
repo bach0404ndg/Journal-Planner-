@@ -388,13 +388,17 @@ label {
 
 .special-task-list {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 9px;
+  min-height: 48px;
   min-width: 0;
 }
 
 .special-task-empty-message {
-  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
   padding: 0 4px;
   color: rgba(22, 51, 33, 0.44);
   font-size: 0.78rem;
@@ -2825,6 +2829,9 @@ textarea:focus {
 }
 
 .side-panel-main {
+  display: grid;
+  gap: 12px;
+  align-content: start;
   min-width: 0;
 }
 
@@ -2862,42 +2869,27 @@ textarea:focus {
   font-weight: 850;
 }
 
+.task-section-title {
+  color: var(--green-meta);
+  padding: 2px 2px 0;
+  font-size: 0.96rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
 .info-dump-panel {
   min-width: 0;
-  padding: 12px;
-  border: 1px solid rgba(22, 51, 33, 0.14);
-  border-radius: var(--radius);
-  background:
-    linear-gradient(to bottom, transparent 31px, var(--line) 32px, transparent 33px),
-    rgba(255, 255, 255, 0.36);
-  background-size: 100% 34px;
-  box-shadow: 0 12px 28px rgba(26, 35, 28, 0.06);
-}
-
-.info-dump-list {
-  gap: 8px;
-}
-
-.info-dump-item {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 6px;
-  padding: 8px;
-}
-
-.info-dump-item.is-done .info-dump-text-input {
-  color: rgba(22, 51, 33, 0.52);
-  text-decoration: line-through;
 }
 
 .info-dump-text-input {
-  min-height: 30px;
-  padding: 3px 6px;
-  font-weight: 700;
+  overflow: hidden;
+  resize: none;
 }
 
-.info-dump-actions {
-  align-self: start;
-  padding-top: 5px;
+.info-dump-handle-spacer {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .time-panel {

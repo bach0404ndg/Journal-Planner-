@@ -35,6 +35,16 @@
           <aside class="side-panel" aria-label="Calendar task editor">
             <div class="side-panel-split">
               <div class="side-panel-main">
+                <div class="task-section-title info-dump-heading">Info Dump</div>
+                <section class="task-column info-dump-panel" aria-label="Info Dump">
+                  <form id="infoDumpForm" class="task-entry-form">
+                    <label>
+                      <input id="infoDumpInput" type="text" placeholder="Add and press Enter" aria-label="Add info dump task">
+                    </label>
+                  </form>
+                  <div class="mini-list info-dump-list" id="infoDumpList"></div>
+                </section>
+                <div class="task-section-title daily-task-heading">Daily Task</div>
                 <div class="calendar-date-controls" aria-label="Calendar date controls">
                   <label>
                     <span>Date</span>
@@ -73,20 +83,10 @@
                     <section class="task-column dated-task-panel" aria-label="Selected day tasks">
                       <form id="calendarNoteForm" class="task-entry-form">
                         <label>
-                          <span>Task</span>
-                          <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter">
+                          <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter" aria-label="Add daily task">
                         </label>
                       </form>
                       <div class="mini-list" id="selectedDateNotes"></div>
-                    </section>
-                    <section class="task-column info-dump-panel" aria-label="Info Dump">
-                      <form id="infoDumpForm" class="task-entry-form">
-                        <label>
-                          <span>Info Dump</span>
-                          <input id="infoDumpInput" type="text" placeholder="Add and press Enter">
-                        </label>
-                      </form>
-                      <div class="mini-list info-dump-list" id="infoDumpList"></div>
                     </section>
                   </div>
                 </div>
