@@ -568,6 +568,13 @@ function normalizeSubtasks(subtasks) {
   }));
 }
 
+function cloneSubtasksForDuplicate(subtasks) {
+  return normalizeSubtasks(subtasks).map((subtask) => ({
+    ...subtask,
+    id: makeId("subtask"),
+  }));
+}
+
 function normalizeTimeEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
   const seconds = Math.max(0, Math.floor(Number(entry.seconds) || 0));
@@ -2565,34 +2572,47 @@ function makeCalendarGoalTask(goalMatch, variant) {
     renderGoals();
   };
 
+  const actions = document.createElement("div");
+  actions.className = "calendar-task-actions goal-task-actions";
+  actions.append(makeSubtaskAddButton(goal, "goal", handleSubtaskChange), makeGoalTaskDateRemoveButton(section.id, goal.id));
+
   if (variant === "calendar") {
-    task.append(checkbox, input, makeTaskDuplicateButton(goal.dueDate, "", () => duplicateGoalTaskToCalendar(goal)));
+    task.append(checkbox, input, actions);
   } else {
-    task.append(checkbox, input, makeSubtaskAddButton(goal, "goal", handleSubtaskChange), source);
+    const textWrap = document.createElement("div");
+    textWrap.className = "task-text-wrap";
+    textWrap.append(input, source);
+
+    task.append(checkbox, textWrap, actions);
   }
   task.append(makeSubtaskPanel(goal, "goal", handleSubtaskChange));
   return task;
 }
 
-function duplicateGoalTaskToCalendar(goal) {
-  if (!goal.dueDate) return;
-
-  queueUndo("goal task duplicate");
-  const notes = state.data.calendarNotes[goal.dueDate] || [];
-  notes.push({
-    id: makeId("note"),
-    text: goal.text,
-    done: false,
-    color: "",
-    time: "",
-    subtasks: [],
+function makeGoalTaskDateRemoveButton(sectionId, goalId) {
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "task-delete-button";
+  deleteButton.type = "button";
+  deleteButton.textContent = "x";
+  deleteButton.setAttribute("aria-label", "Remove goal from this date");
+  deleteButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    removeGoalTaskDate(sectionId, goalId);
   });
-  state.data.calendarNotes[goal.dueDate] = notes;
+  return deleteButton;
+}
+
+function removeGoalTaskDate(sectionId, goalId) {
+  const section = getAllGoalSections().find((item) => item.id === sectionId);
+  const goal = section?.goals.find((item) => item.id === goalId);
+  if (!goal || !goal.dueDate) return;
+
+  queueUndo("goal date removal");
+  goal.dueDate = "";
   saveData();
   renderCalendar();
-  if (goal.dueDate === state.selectedDate) {
-    renderSelectedDateNotes();
-  }
+  renderSelectedDateNotes();
+  renderGoals();
 }
 
 function deleteCalendarTask(dateKey, noteId) {
@@ -2650,6 +2670,7 @@ function duplicateCalendarTask(dateKey, noteId) {
     ...cloneData(note),
     id: makeId("note"),
     done: false,
+    subtasks: cloneSubtasksForDuplicate(note.subtasks),
   };
   state.data.calendarNotes[dateKey] = [...(state.data.calendarNotes[dateKey] || []), duplicate];
   saveData();
