@@ -357,6 +357,10 @@ function restorePersistedTimerState() {
   try {
     const restored = normalizePersistedTimer(JSON.parse(localStorage.getItem(TIMER_STORAGE_KEY)));
     if (!restored) return;
+    if (!restored.taskId || !isTimerTaskVisible(restored.dateKey, restored.taskId)) {
+      clearPersistedTimerState();
+      return;
+    }
 
     Object.assign(state.timer, restored);
     if (state.timer.status === "running" && !state.timer.sessionStartEpoch) {
@@ -3965,7 +3969,10 @@ function setTimePanelView(view) {
 /* Task selector */
 
 function getTimerSelectableTasks(dateKey = state.selectedDate) {
-  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []).filter((note) => note.specialTaskId);
+  const activeSpecialTaskIds = new Set(state.data.savedCalendarTasks.map((task) => task.id));
+  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []).filter((note) =>
+    note.specialTaskId && activeSpecialTaskIds.has(note.specialTaskId),
+  );
 }
 
 function getTimerSelectableTaskCount(dateKey = state.selectedDate) {
@@ -4001,7 +4008,7 @@ function renderTimerTaskSelect() {
     var activeValue = state.timer.taskId
       ? state.timer.taskId + (state.timer.subtaskId ? ":" + state.timer.subtaskId : "")
       : "";
-    if (activeValue && !els.timerTaskSelect.querySelector("option[value=\"" + activeValue + "\"]")) {
+    if (activeValue && state.timer.dateKey === state.selectedDate && !els.timerTaskSelect.querySelector("option[value=\"" + activeValue + "\"]")) {
       var activeLabel = state.timer.subtaskText ? "— " + state.timer.subtaskText : state.timer.taskText;
       els.timerTaskSelect.append(makeOption(activeValue, activeLabel));
     }
