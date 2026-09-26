@@ -62,6 +62,7 @@ const calendarTaskColors = [
 ];
 
 const timeBreakLabel = "Break";
+const emptyTimerTaskLabel = "Add a special task to today's task";
 const breakTrackColor = { color: "rgba(22, 51, 33, 0.38)", tint: "rgba(22, 51, 33, 0.08)" };
 const defaultTimerMinutes = 25;
 const defaultBreakMinutes = 5;
@@ -241,11 +242,13 @@ function loadData() {
       const goalSections = normalizeGoalSections(saved.goalSections);
       const goalGroups = normalizeGoalGroups(saved.goalGroups, goalSections);
       const savedCalendarTasks = normalizeSavedCalendarTasks(saved.savedCalendarTasks);
+      const calendarNotes = normalizeCalendarNotes(saved.calendarNotes);
+      const specialTaskCatalog = buildSpecialTaskCatalog(savedCalendarTasks, calendarNotes);
       return {
-        calendarNotes: normalizeCalendarNotes(saved.calendarNotes),
+        calendarNotes,
         savedCalendarTasks,
-        trackedSpecialTaskIds: normalizeTrackedSpecialTaskIds(saved.trackedSpecialTaskIds, savedCalendarTasks),
-        hiddenAllSpecialTaskCounterIds: normalizeTrackedSpecialTaskIds(saved.hiddenAllSpecialTaskCounterIds, savedCalendarTasks),
+        trackedSpecialTaskIds: normalizeTrackedSpecialTaskIds(saved.trackedSpecialTaskIds, specialTaskCatalog),
+        hiddenAllSpecialTaskCounterIds: normalizeTrackedSpecialTaskIds(saved.hiddenAllSpecialTaskCounterIds, specialTaskCatalog),
         showAllSpecialTaskCounters: Boolean(saved.showAllSpecialTaskCounters),
         infoDumpTasks: normalizeInfoDumpTasks(saved.infoDumpTasks),
         dayEmojis: saved.dayEmojis || {},
@@ -509,6 +512,32 @@ function normalizeSavedCalendarTasks(savedTasks) {
       seen.add(key);
       return true;
     });
+}
+
+function buildSpecialTaskCatalog(savedTasks = [], calendarNotes = {}) {
+  const catalog = new Map();
+  savedTasks.forEach((task) => {
+    catalog.set(task.id, { ...task, archived: false });
+  });
+
+  Object.values(calendarNotes || {}).forEach((notes) => {
+    if (!Array.isArray(notes)) return;
+    notes.forEach((note) => {
+      if (!note.specialTaskId || catalog.has(note.specialTaskId)) return;
+      catalog.set(note.specialTaskId, {
+        id: note.specialTaskId,
+        text: note.text || "Removed special task",
+        color: normalizeCalendarTaskColor(note.color),
+        archived: true,
+      });
+    });
+  });
+
+  return [...catalog.values()];
+}
+
+function getSpecialTaskCatalog() {
+  return buildSpecialTaskCatalog(state.data.savedCalendarTasks, state.data.calendarNotes);
 }
 
 function normalizeTrackedSpecialTaskIds(savedIds, savedTasks = []) {
@@ -1596,15 +1625,16 @@ function removeSpecialTask(taskId) {
 
   queueUndo("special task removal");
   state.data.savedCalendarTasks = state.data.savedCalendarTasks.filter((item) => item.id !== taskId);
+  const specialTaskCatalog = getSpecialTaskCatalog();
   state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(
     state.data.trackedSpecialTaskIds,
-    state.data.savedCalendarTasks,
+    specialTaskCatalog,
   );
   state.data.hiddenAllSpecialTaskCounterIds = normalizeTrackedSpecialTaskIds(
     state.data.hiddenAllSpecialTaskCounterIds,
-    state.data.savedCalendarTasks,
+    specialTaskCatalog,
   );
-  if (!state.data.savedCalendarTasks.length) {
+  if (!specialTaskCatalog.length) {
     state.data.showAllSpecialTaskCounters = false;
   }
   saveData();
@@ -2148,13 +2178,14 @@ function renderCalendar() {
 
 function renderSpecialTaskTracker(gridStart, totalDays) {
   els.specialTaskTracker.innerHTML = "";
+  const specialTaskCatalog = getSpecialTaskCatalog();
   state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(
     state.data.trackedSpecialTaskIds,
-    state.data.savedCalendarTasks,
+    specialTaskCatalog,
   );
   state.data.hiddenAllSpecialTaskCounterIds = normalizeTrackedSpecialTaskIds(
     state.data.hiddenAllSpecialTaskCounterIds,
-    state.data.savedCalendarTasks,
+    specialTaskCatalog,
   );
 
   const counts = new Map();
@@ -2185,9 +2216,9 @@ function renderSpecialTaskTracker(gridStart, totalDays) {
 
   const hiddenAllIds = new Set(state.data.hiddenAllSpecialTaskCounterIds);
   const trackerTasks = state.data.showAllSpecialTaskCounters
-    ? state.data.savedCalendarTasks.filter((task) => (counts.get(task.id) || 0) > 0 && !hiddenAllIds.has(task.id))
+    ? specialTaskCatalog.filter((task) => (counts.get(task.id) || 0) > 0 && !hiddenAllIds.has(task.id))
     : state.data.trackedSpecialTaskIds
-        .map((taskId) => state.data.savedCalendarTasks.find((item) => item.id === taskId))
+        .map((taskId) => specialTaskCatalog.find((item) => item.id === taskId))
         .filter(Boolean);
 
   trackerTasks.forEach((task) => {
@@ -2237,13 +2268,14 @@ function makeSpecialTaskCounterAddMenu() {
   const items = document.createElement("div");
   items.className = "special-task-counter-add-items";
   const trackedIds = new Set(state.data.showAllSpecialTaskCounters
-    ? state.data.savedCalendarTasks
+    ? getSpecialTaskCatalog()
         .map((task) => task.id)
         .filter((id) => !state.data.hiddenAllSpecialTaskCounterIds.includes(id))
     : state.data.trackedSpecialTaskIds);
-  const availableTasks = state.data.savedCalendarTasks.filter((task) => !trackedIds.has(task.id));
+  const specialTaskCatalog = getSpecialTaskCatalog();
+  const availableTasks = specialTaskCatalog.filter((task) => !trackedIds.has(task.id));
 
-  if (state.data.savedCalendarTasks.length) {
+  if (specialTaskCatalog.length) {
     const allButton = document.createElement("button");
     allButton.className = "special-task-counter-all";
     allButton.type = "button";
@@ -2258,7 +2290,7 @@ function makeSpecialTaskCounterAddMenu() {
   if (!availableTasks.length) {
     const empty = document.createElement("span");
     empty.className = "special-task-counter-empty";
-    empty.textContent = state.data.savedCalendarTasks.length ? "All shown" : "No tasks";
+    empty.textContent = specialTaskCatalog.length ? "All shown" : "No tasks";
     items.append(empty);
   } else {
     availableTasks.forEach((task) => {
@@ -2278,14 +2310,15 @@ function makeSpecialTaskCounterAddMenu() {
 }
 
 function addSpecialTaskCounter(taskId) {
-  if (!state.data.savedCalendarTasks.some((task) => task.id === taskId)) return;
+  const specialTaskCatalog = getSpecialTaskCatalog();
+  if (!specialTaskCatalog.some((task) => task.id === taskId)) return;
   if (!state.data.showAllSpecialTaskCounters && state.data.trackedSpecialTaskIds.includes(taskId)) return;
   queueUndo("special task counter");
   state.data.showAllSpecialTaskCounters = false;
   state.data.hiddenAllSpecialTaskCounterIds = [];
   state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(
     [...state.data.trackedSpecialTaskIds, taskId],
-    state.data.savedCalendarTasks,
+    specialTaskCatalog,
   );
   saveData();
   const { gridStart, totalDays } = getCalendarGridRange();
@@ -2293,12 +2326,13 @@ function addSpecialTaskCounter(taskId) {
 }
 
 function addAllSpecialTaskCounters() {
-  const allIds = state.data.savedCalendarTasks.map((task) => task.id);
+  const specialTaskCatalog = getSpecialTaskCatalog();
+  const allIds = specialTaskCatalog.map((task) => task.id);
   if (state.data.showAllSpecialTaskCounters && allIds.length && !state.data.hiddenAllSpecialTaskCounterIds.length) return;
   queueUndo("all special task counters");
   state.data.showAllSpecialTaskCounters = true;
   state.data.hiddenAllSpecialTaskCounterIds = [];
-  state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(allIds, state.data.savedCalendarTasks);
+  state.data.trackedSpecialTaskIds = normalizeTrackedSpecialTaskIds(allIds, specialTaskCatalog);
   saveData();
   const { gridStart, totalDays } = getCalendarGridRange();
   renderSpecialTaskTracker(gridStart, totalDays);
@@ -2310,7 +2344,7 @@ function removeSpecialTaskCounter(taskId) {
   if (state.data.showAllSpecialTaskCounters) {
     state.data.hiddenAllSpecialTaskCounterIds = normalizeTrackedSpecialTaskIds(
       [...state.data.hiddenAllSpecialTaskCounterIds, taskId],
-      state.data.savedCalendarTasks,
+      getSpecialTaskCatalog(),
     );
   } else {
     state.data.trackedSpecialTaskIds = state.data.trackedSpecialTaskIds.filter((id) => id !== taskId);
@@ -3234,6 +3268,7 @@ function stopTick() {
 
 function startTimer() {
   if (state.timer.status === "running") return;
+  if (state.timer.status === "idle" && !els.timerTaskSelect.value && !getTimerSelectableTaskCount()) return;
   var seconds = defaultTimerDurationSeconds();
   ensureAudioContext();
 
@@ -3914,14 +3949,28 @@ function setTimePanelView(view) {
 
 /* Task selector */
 
+function getTimerSelectableTaskCount(dateKey = state.selectedDate) {
+  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []).length;
+}
+
 function populateTaskSelectOptions(selectEl) {
+  var tasks = sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []);
+  if (!tasks.length) {
+    var empty = makeOption("", emptyTimerTaskLabel);
+    empty.disabled = true;
+    empty.selected = true;
+    selectEl.append(empty);
+    return 0;
+  }
+
   selectEl.append(makeOption("", timeBreakLabel));
-  sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []).forEach(function (note) {
+  tasks.forEach(function (note) {
     selectEl.append(makeOption(note.id, note.text));
     (note.subtasks || []).forEach(function (subtask) {
       selectEl.append(makeOption(note.id + ":" + subtask.id, "— " + subtask.text));
     });
   });
+  return tasks.length;
 }
 
 function renderTimerTaskSelect() {
@@ -3970,6 +4019,7 @@ function renderTimerControls() {
   els.timerStopConfirm.hidden = !confirming;
   els.clearTimeEntriesButton.hidden = !getDayTimeEntries(state.selectedDate).length;
   renderTimerTaskSelect();
+  els.timerStartButton.disabled = !confirming && status === "idle" && !getTimerSelectableTaskCount();
   if (confirming) {
     els.timerStatusText.textContent = "Confirm stop — " + formatHoursMinutes(liveElapsedSeconds()) + " tracked";
   }
