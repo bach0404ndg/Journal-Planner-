@@ -3166,8 +3166,7 @@ textarea:focus {
 
 .timer-controls {
   width: 100%;
-  max-width: 260px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 .timer-controls[hidden] {
@@ -3179,10 +3178,10 @@ textarea:focus {
   gap: 6px;
   width: 100%;
   max-width: 260px;
-  margin-top: auto;
+  margin-top: 0;
   margin-left: auto;
   margin-right: auto;
-  padding-top: 16px;
+  padding-top: 10px;
   border-top: 1px solid rgba(22, 51, 33, 0.1);
 }
 

@@ -3510,11 +3510,13 @@ function getDayTimeBuckets(dateKey) {
     bucket.seconds += seconds;
   }
 
-  (state.data.timeEntries[dateKey] || []).forEach(function (entry) {
+  (state.data.timeEntries[dateKey] || []).filter(function (entry) {
+    return shouldShowTimerEntry(dateKey, entry);
+  }).forEach(function (entry) {
     addSeconds(entry.taskId || "break", entry.taskText || "Untitled", entry.color, entry.seconds);
   });
 
-  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey) {
+  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey && isTimerTaskVisible(dateKey, state.timer.taskId)) {
     addSeconds(state.timer.taskId || "break", state.timer.taskText || "Untitled", state.timer.color, liveElapsedSeconds());
   }
 
@@ -3525,8 +3527,10 @@ function getDayTimeBuckets(dateKey) {
 }
 
 function getSequentialTimeSegments(dateKey) {
-  var entries = getDayTimeEntries(dateKey).slice();
-  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey) {
+  var entries = getDayTimeEntries(dateKey).filter(function (entry) {
+    return shouldShowTimerEntry(dateKey, entry);
+  });
+  if (state.timer.status !== "idle" && state.timer.dateKey === dateKey && isTimerTaskVisible(dateKey, state.timer.taskId)) {
     entries.push({
       id: "__live__",
       taskId: state.timer.taskId,
@@ -3553,6 +3557,17 @@ function getSequentialTimeSegments(dateKey) {
       endedAt: entry.endedAt || "",
     };
   });
+}
+
+function isTimerTaskVisible(dateKey, taskId) {
+  if (!taskId) return true;
+  return getTimerSelectableTasks(dateKey).some(function (note) {
+    return note.id === taskId;
+  });
+}
+
+function shouldShowTimerEntry(dateKey, entry) {
+  return isTimerTaskVisible(dateKey, entry.taskId);
 }
 
 function renderPieSlices(buckets, total) {
@@ -3673,7 +3688,7 @@ function makeHistoryAddRow() {
     confirmButton.setAttribute("aria-label", "Confirm add time");
     confirmButton.addEventListener("click", function () {
       var seconds = readDurationMaskSeconds(hoursInput, minutesInput);
-      if (seconds <= 0) {
+      if (seconds <= 0 || !select.value) {
         durationMask.classList.add("is-invalid");
         return;
       }
@@ -3949,12 +3964,16 @@ function setTimePanelView(view) {
 
 /* Task selector */
 
+function getTimerSelectableTasks(dateKey = state.selectedDate) {
+  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []).filter((note) => note.specialTaskId);
+}
+
 function getTimerSelectableTaskCount(dateKey = state.selectedDate) {
-  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []).length;
+  return getTimerSelectableTasks(dateKey).length;
 }
 
 function populateTaskSelectOptions(selectEl) {
-  var tasks = sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []);
+  var tasks = getTimerSelectableTasks(state.selectedDate);
   if (!tasks.length) {
     var empty = makeOption("", emptyTimerTaskLabel);
     empty.disabled = true;
@@ -3963,7 +3982,6 @@ function populateTaskSelectOptions(selectEl) {
     return 0;
   }
 
-  selectEl.append(makeOption("", timeBreakLabel));
   tasks.forEach(function (note) {
     selectEl.append(makeOption(note.id, note.text));
     (note.subtasks || []).forEach(function (subtask) {
