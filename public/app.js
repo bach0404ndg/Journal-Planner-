@@ -1524,7 +1524,7 @@ function addSpecialTaskToSelectedDate(task) {
   if (notes.some((note) => note.specialTaskId === task.id)) return;
 
   queueUndo("calendar special task");
-  notes.push({
+  const note = {
     id: makeId("note"),
     text: task.text,
     done: false,
@@ -1532,11 +1532,16 @@ function addSpecialTaskToSelectedDate(task) {
     time: "",
     specialTaskId: task.id,
     subtasks: [],
-  });
+  };
+  notes.push(note);
   state.data.calendarNotes[state.selectedDate] = notes;
   saveData();
   renderCalendar();
   renderSelectedDateNotes();
+  if (state.timer.status === "idle") {
+    els.timerTaskSelect.value = note.id;
+    renderTimerDisplay();
+  }
 }
 
 function saveSpecialTaskName(taskId, value) {
@@ -4064,7 +4069,7 @@ function renderSelectedDateNotes() {
     els.selectedDateNotes.append(makeCalendarGoalTask(goalMatch, "selected"));
   });
 
-  renderTimerTaskSelect();
+  renderTimerControls();
   renderTimePie();
   renderTimerDisplay();
 }
