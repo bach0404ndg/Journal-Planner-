@@ -363,13 +363,12 @@ function restorePersistedTimerState() {
     }
 
     Object.assign(state.timer, restored);
+    if (state.timer.status === "finished" || (state.timer.status === "running" && liveRemainingSeconds() <= 0)) {
+      stopTimer(true);
+      return;
+    }
     if (state.timer.status === "running" && !state.timer.sessionStartEpoch) {
       state.timer.status = "paused";
-    }
-    if (state.timer.status === "running" && liveRemainingSeconds() <= 0) {
-      state.timer.status = "finished";
-      state.timer.accumulatedSeconds = state.timer.durationSeconds;
-      state.timer.sessionStartEpoch = null;
     }
     if (state.timer.status === "running") {
       state.timer.tickHandle = window.setInterval(tickTimer, 250);
@@ -1138,7 +1137,7 @@ function bindEvents() {
   els.timeChartModeSequenceButton.addEventListener("click", function () {
     setTimeChartMode("sequence");
   });
-  window.addEventListener("pagehide", persistTimerState);
+  window.addEventListener("pagehide", endTimerForNavigation);
 
   els.journalForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1753,6 +1752,9 @@ function shiftCalendarRange(direction) {
 }
 
 function setCalendarDate(dateKey) {
+  if (dateKey !== state.selectedDate) {
+    endTimerForNavigation();
+  }
   const nextDate = parseDateKey(dateKey);
   state.selectedDate = dateKey;
   state.month = nextDate.getMonth();
@@ -3336,16 +3338,13 @@ function tickTimer() {
 }
 
 function finishTimer() {
-  stopTick();
-  state.timer.status = "finished";
   state.timer.accumulatedSeconds = state.timer.durationSeconds;
-  state.timer.sessionStartEpoch = null;
-  playAlarm();
-  els.timerDisplay.classList.add("is-alarm");
-  persistTimerState();
-  renderTimerControls();
-  renderTimerDisplay();
-  renderTimePie();
+  stopTimer(true);
+}
+
+function endTimerForNavigation() {
+  if (state.timer.status === "idle") return;
+  stopTimer(true);
 }
 
 function continueTimer() {
