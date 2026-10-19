@@ -27,6 +27,20 @@
             </summary>
             <div class="color-menu-items" id="paletteOptions"></div>
           </details>
+          <details class="ai-access-control">
+            <summary class="metadata-button">AI access</summary>
+            <div class="ai-access-panel">
+              <label for="aiAccessToken">Access key</label>
+              <input id="aiAccessToken" type="password" autocomplete="off" placeholder="Cloudflare access key">
+              <div class="ai-access-actions">
+                <button class="metadata-button" id="aiPushButton" type="button">Send local data</button>
+                <button class="metadata-button" id="aiPullButton" type="button">Load cloud data</button>
+              </div>
+              <p id="aiAccessStatus" role="status">Cloud sync is off.</p>
+              <p>Keep this key private. MCP endpoint: <code id="aiMcpEndpoint"></code></p>
+              <button class="metadata-button" id="copyMuseConfigButton" type="button">Copy Muse setup</button>
+            </div>
+          </details>
         </div>
       </div>
 

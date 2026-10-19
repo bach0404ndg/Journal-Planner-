@@ -1,6 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "journal-project",
-  "compatibility_date": "2026-07-29",
-  "pages_build_output_dir": "public"
+  "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": "public",
+  "d1_databases": [
+    {
+      "binding": "PLANNER_DB",
+      "database_name": "journal-planner-data",
+      "database_id": "f4b1d6c6-24d6-40b1-b8d9-a24a5a5b3db0"
+    }
+  ]
 }

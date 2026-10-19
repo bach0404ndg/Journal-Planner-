@@ -1,5 +1,6 @@
 const STORAGE_KEY = "monthly-planner-journal-v1";
 const TIMER_STORAGE_KEY = "monthly-planner-journal-active-timer-v1";
+const AI_TOKEN_KEY = "monthly-planner-ai-access-token-v1";
 
 const monthNames = [
   "January",
@@ -171,6 +172,12 @@ const els = {
   calendarNextButton: document.querySelector("#calendarNextButton"),
   rangeButtons: document.querySelectorAll(".range-button"),
   undoButton: document.querySelector("#undoButton"),
+  aiAccessToken: document.querySelector("#aiAccessToken"),
+  aiPushButton: document.querySelector("#aiPushButton"),
+  aiPullButton: document.querySelector("#aiPullButton"),
+  aiAccessStatus: document.querySelector("#aiAccessStatus"),
+  aiMcpEndpoint: document.querySelector("#aiMcpEndpoint"),
+  copyMuseConfigButton: document.querySelector("#copyMuseConfigButton"),
   tabs: document.querySelectorAll(".tab"),
   views: document.querySelectorAll(".view"),
   goalGroupTabs: document.querySelector("#goalGroupTabs"),
@@ -911,6 +918,36 @@ function init() {
 }
 
 function bindEvents() {
+  els.aiAccessToken.value = localStorage.getItem(AI_TOKEN_KEY) || "";
+  els.aiMcpEndpoint.textContent = `${window.location.origin}/mcp`;
+  els.aiAccessToken.addEventListener("change", () => {
+    localStorage.setItem(AI_TOKEN_KEY, els.aiAccessToken.value.trim());
+    setAiSyncStatus("Access key saved on this device.");
+  });
+  els.aiPushButton.addEventListener("click", pushPlannerToCloud);
+  els.aiPullButton.addEventListener("click", pullPlannerFromCloud);
+  els.copyMuseConfigButton.addEventListener("click", async () => {
+    try {
+      const token = els.aiAccessToken.value.trim();
+      if (!token) throw new Error("Enter your Cloudflare access key first.");
+      const config = {
+        mcp_servers: {
+          "your-planner": {
+            transport: "streamable_http",
+            url: `${window.location.origin}/mcp`,
+            headers: { Authorization: `Bearer ${token}` },
+            enabled: true,
+            mode: "optional",
+          },
+        },
+      };
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      setAiSyncStatus("Muse setup copied. Keep it private because it contains your access key.");
+    } catch (error) {
+      setAiSyncStatus(error.message || "Could not copy Muse setup.");
+    }
+  });
+
   els.monthSelect.addEventListener("change", () => {
     state.month = Number(els.monthSelect.value);
     selectFirstVisibleDate();
@@ -1288,6 +1325,52 @@ function bindEvents() {
   els.removeOldDataButton.addEventListener("click", () => {
     removeOldData();
   });
+}
+
+function setAiSyncStatus(message) {
+  els.aiAccessStatus.textContent = message;
+}
+
+function aiAuthHeaders() {
+  const token = els.aiAccessToken.value.trim();
+  if (!token) throw new Error("Enter your Cloudflare access key first.");
+  localStorage.setItem(AI_TOKEN_KEY, token);
+  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+}
+
+async function pushPlannerToCloud() {
+  try {
+    const headers = aiAuthHeaders();
+    const current = await fetch("/api/planner", { headers });
+    if (!current.ok && current.status !== 404) throw new Error("Could not read cloud data. Check the access key.");
+    const remote = current.status === 404 ? null : await current.json();
+    if (remote && !window.confirm("Cloud data already exists. Replace it with this browser's planner?")) return;
+    const response = await fetch("/api/planner", {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ data: state.data, expectedVersion: remote?.version ?? 0 }),
+    });
+    if (!response.ok) throw new Error(response.status === 409 ? "Cloud data changed. Load it first, then try again." : "Cloud save failed.");
+    const saved = await response.json();
+    setAiSyncStatus(`Local planner copied to Cloudflare (version ${saved.version}).`);
+  } catch (error) {
+    setAiSyncStatus(error.message || "Cloud sync failed.");
+  }
+}
+
+async function pullPlannerFromCloud() {
+  try {
+    const response = await fetch("/api/planner", { headers: aiAuthHeaders() });
+    if (response.status === 404) throw new Error("No cloud copy found yet. Send local data first.");
+    if (!response.ok) throw new Error("Could not load cloud data. Check the access key.");
+    const remote = await response.json();
+    if (!window.confirm("Replace this browser's planner with the Cloudflare copy? A local safety copy will be kept.")) return;
+    localStorage.setItem(`${STORAGE_KEY}-before-cloud-sync`, localStorage.getItem(STORAGE_KEY) || "{}");
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(remote.data));
+    window.location.reload();
+  } catch (error) {
+    setAiSyncStatus(error.message || "Cloud sync failed.");
+  }
 }
 
 function applyPalette() {
