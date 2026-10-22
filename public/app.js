@@ -170,7 +170,7 @@ const els = {
   todayButton: document.querySelector("#todayButton"),
   calendarPrevButton: document.querySelector("#calendarPrevButton"),
   calendarNextButton: document.querySelector("#calendarNextButton"),
-  rangeButtons: document.querySelectorAll(".range-button"),
+  rangeButtons: document.querySelectorAll("[data-range]"),
   undoButton: document.querySelector("#undoButton"),
   aiAccessToken: document.querySelector("#aiAccessToken"),
   aiPushButton: document.querySelector("#aiPushButton"),
