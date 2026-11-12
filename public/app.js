@@ -627,13 +627,6 @@ function normalizeSubtasks(subtasks) {
   }));
 }
 
-function cloneSubtasksForDuplicate(subtasks) {
-  return normalizeSubtasks(subtasks).map((subtask) => ({
-    ...subtask,
-    id: makeId("subtask"),
-  }));
-}
-
 function normalizeTimeEntry(entry) {
   if (!entry || typeof entry !== "object") return null;
   const seconds = Math.max(0, Math.floor(Number(entry.seconds) || 0));
@@ -3067,25 +3060,6 @@ function updateCalendarTaskText(dateKey, noteId, text) {
   }
 }
 
-function duplicateCalendarTask(dateKey, noteId) {
-  const note = (state.data.calendarNotes[dateKey] || []).find((item) => item.id === noteId);
-  if (!note) return;
-
-  queueUndo("calendar task duplicate");
-  const duplicate = {
-    ...cloneData(note),
-    id: makeId("note"),
-    done: false,
-    subtasks: cloneSubtasksForDuplicate(note.subtasks),
-  };
-  state.data.calendarNotes[dateKey] = [...(state.data.calendarNotes[dateKey] || []), duplicate];
-  saveData();
-  renderCalendar();
-  if (dateKey === state.selectedDate) {
-    renderSelectedDateNotes();
-  }
-}
-
 function renderInfoDump() {
   els.infoDumpList.innerHTML = "";
 
@@ -3242,22 +3216,6 @@ function makeInfoDumpRow(task) {
   return item;
 }
 
-function makeTaskDuplicateButton(dateKey, noteId, customDuplicate) {
-  const button = document.createElement("button");
-  button.className = "task-duplicate-button";
-  button.type = "button";
-  button.textContent = "□";
-  button.setAttribute("aria-label", "Duplicate task");
-  button.addEventListener("click", () => {
-    if (customDuplicate) {
-      customDuplicate();
-      return;
-    }
-    duplicateCalendarTask(dateKey, noteId);
-  });
-  return button;
-}
-
 function makeTaskRow(note, dateKey, variant) {
   const isSpecialCalendarTask = variant === "calendar" && Boolean(note.specialTaskId);
   const task = document.createElement("div");
@@ -3333,11 +3291,7 @@ function makeTaskRow(note, dateKey, variant) {
 
   const actions = document.createElement("div");
   actions.className = "calendar-task-actions";
-  if (variant === "calendar") {
-    actions.append(makeTaskDuplicateButton(dateKey, note.id), deleteButton);
-  } else {
-    actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
-  }
+  actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
 
   task.append(checkbox, textWrap, actions);
   task.append(makeSubtaskPanel(note, "calendar task", handleSubtaskChange));

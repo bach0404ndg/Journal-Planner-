@@ -3976,6 +3976,47 @@ body.is-dragging-special-task .day-cell.is-task-drop-target {
   text-overflow: ellipsis;
 }
 
+.note-pill .subtask-panel {
+  padding-left: 1px;
+}
+
+.note-pill .subtask-row {
+  position: relative;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px;
+}
+
+.note-pill .subtask-row input[type="checkbox"] {
+  width: 12px;
+  min-height: 12px;
+}
+
+.note-pill .subtask-text-input {
+  min-height: 18px;
+  padding: 0 1px;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+}
+
+.note-pill .subtask-delete-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(20, 24, 20, 0.18);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.note-pill .subtask-row:hover .subtask-delete-button,
+.note-pill .subtask-row:focus-within .subtask-delete-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .note-pill .calendar-task-actions {
   position: absolute;
   top: 2px;
@@ -4013,6 +4054,11 @@ body.is-dragging-special-task .day-cell.is-task-drop-target {
 
   .special-task-remove {
     opacity: 1;
+  }
+
+  .note-pill .subtask-delete-button {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
