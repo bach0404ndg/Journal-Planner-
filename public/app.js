@@ -1,6 +1,19 @@
 const STORAGE_KEY = "monthly-planner-journal-v1";
 const TIMER_STORAGE_KEY = "monthly-planner-journal-active-timer-v1";
 const AI_TOKEN_KEY = "monthly-planner-ai-access-token-v1";
+const AI_AUTO_SYNC_KEY = "monthly-planner-ai-auto-sync-v1";
+const TIMER_MINUTES_KEY = "monthly-planner-timer-minutes-v1";
+// Drags carry a private type instead of plain text, so dropping a task or tile
+// onto a text box can never paste its internal id into the text.
+const DRAG_DATA_TYPE = "application/x-planner-item";
+
+let autoSyncEnabled = false;
+let autoSyncVersion = null;
+let lastSyncedSnapshot = null;
+let autoSyncPushTimer = null;
+let autoSyncPollTimer = null;
+let autoSyncBusy = false;
+let autoSyncListenersBound = false;
 
 const monthNames = [
   "January",
@@ -62,11 +75,14 @@ const calendarTaskColors = [
   { id: "lilac", name: "Lilac", color: "#a985e8", tint: "rgba(226, 211, 255, 0.4)" },
 ];
 
-const timeBreakLabel = "Break";
-const emptyTimerTaskLabel = "Add a special task to today's task";
+const timeBreakLabel = "No task";
+const emptyTimerTaskLabel = "No special task on this day";
 const breakTrackColor = { color: "rgba(22, 51, 33, 0.38)", tint: "rgba(22, 51, 33, 0.08)" };
 const defaultTimerMinutes = 25;
-const defaultBreakMinutes = 5;
+const timerPresetMinutes = [15, 25, 45, 60];
+const minTimerMinutes = 5;
+const maxTimerMinutes = 180;
+const baseDocumentTitle = document.title;
 
 const goalPaperColors = [
   { id: "", name: "Paper", color: "rgba(22, 51, 33, 0.24)", tint: "rgba(255, 255, 255, 0.28)" },
@@ -140,17 +156,16 @@ const state = {
 const els = {
   calendarLayout: document.querySelector("#calendarLayout"),
   calendarPanel: document.querySelector("#calendarPanel"),
-  calendarPanelToggle: document.querySelector("#calendarPanelToggle"),
-  monthSelect: document.querySelector("#monthSelect"),
-  yearInput: document.querySelector("#yearInput"),
+  calendarTitleButton: document.querySelector("#calendarTitleButton"),
+  calendarTitle: document.querySelector("#calendarTitle"),
+  selectedDayEyebrow: document.querySelector("#selectedDayEyebrow"),
+  selectedDayTitle: document.querySelector("#selectedDayTitle"),
   weekdayRow: document.querySelector("#weekdayRow"),
   calendarGrid: document.querySelector("#calendarGrid"),
   specialTaskTrackerArea: document.querySelector("#specialTaskTrackerArea"),
   specialTaskTrackerToggle: document.querySelector("#specialTaskTrackerToggle"),
   specialTaskTracker: document.querySelector("#specialTaskTracker"),
-  selectedDateInput: document.querySelector("#selectedDateInput"),
   selectedDatePicker: document.querySelector("#selectedDatePicker"),
-  selectedDatePickerButton: document.querySelector("#selectedDatePickerButton"),
   calendarRemoveOldDataButton: document.querySelector("#calendarRemoveOldDataButton"),
   calendarNoteForm: document.querySelector("#calendarNoteForm"),
   calendarNoteInput: document.querySelector("#calendarNoteInput"),
@@ -173,6 +188,7 @@ const els = {
   rangeButtons: document.querySelectorAll("[data-range]"),
   undoButton: document.querySelector("#undoButton"),
   aiAccessToken: document.querySelector("#aiAccessToken"),
+  aiAutoSync: document.querySelector("#aiAutoSync"),
   aiPushButton: document.querySelector("#aiPushButton"),
   aiPullButton: document.querySelector("#aiPullButton"),
   aiAccessStatus: document.querySelector("#aiAccessStatus"),
@@ -213,17 +229,14 @@ const els = {
   clearTimeEntriesButton: document.querySelector("#clearTimeEntriesButton"),
   timePanel: document.querySelector("#timePanel"),
   timePanelToggle: document.querySelector("#timePanelToggle"),
-  timePieChart: document.querySelector("#timePieChart"),
-  timePieSlices: document.querySelector("#timePieSlices"),
+  timeBar: document.querySelector("#timeBar"),
+  timeTodayLabel: document.querySelector("#timeTodayLabel"),
   timeChartTotal: document.querySelector("#timeChartTotal"),
   timeChartModeMergedButton: document.querySelector("#timeChartModeMergedButton"),
   timeChartModeSequenceButton: document.querySelector("#timeChartModeSequenceButton"),
   timeChartArea: document.querySelector("#timeChartArea"),
   timeSequenceList: document.querySelector("#timeSequenceList"),
-  timerControls: document.querySelector("#timerControls"),
   timeLegend: document.querySelector("#timeLegend"),
-  timeViewLegendButton: document.querySelector("#timeViewLegendButton"),
-  timeViewTimerButton: document.querySelector("#timeViewTimerButton"),
   timerSession: document.querySelector("#timerSession"),
   timerTaskSelect: document.querySelector("#timerTaskSelect"),
   timerSubtractButton: document.querySelector("#timerSubtractButton"),
@@ -232,7 +245,13 @@ const els = {
   timerTimeText: document.querySelector("#timerTimeText"),
   timerStatusText: document.querySelector("#timerStatusText"),
   timerStartButton: document.querySelector("#timerStartButton"),
+  timerPauseButton: document.querySelector("#timerPauseButton"),
   timerStopButton: document.querySelector("#timerStopButton"),
+  timerRingProgress: document.querySelector("#timerRingProgress"),
+  timerRingTask: document.querySelector("#timerRingTask"),
+  timerRingSub: document.querySelector("#timerRingSub"),
+  timerTaskChips: document.querySelector("#timerTaskChips"),
+  timerPresets: document.querySelector("#timerPresets"),
   timerContinueButton: document.querySelector("#timerContinueButton"),
   timerEndButton: document.querySelector("#timerEndButton"),
   timerFinishedControls: document.querySelector("#timerFinishedControls"),
@@ -307,6 +326,7 @@ function loadData() {
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
   updateUndoButton();
+  scheduleAutomaticPush();
 }
 
 function serializableTimerState() {
@@ -875,13 +895,6 @@ function makeId(prefix) {
 function init() {
   applyPalette();
 
-  monthNames.forEach((name, index) => {
-    const option = document.createElement("option");
-    option.value = index;
-    option.textContent = name;
-    els.monthSelect.append(option);
-  });
-
   els.journalFilterMonth.append(makeOption("", ""));
   monthNames.forEach((name, index) => {
     els.journalFilterMonth.append(makeOption(String(index + 1), name));
@@ -894,9 +907,6 @@ function init() {
     els.weekdayRow.append(day);
   });
 
-  els.monthSelect.value = state.month;
-  els.yearInput.value = state.year;
-  els.selectedDateInput.value = state.selectedDate;
   els.selectedDatePicker.value = state.selectedDate;
 
   const now = new Date();
@@ -923,9 +933,24 @@ function bindEvents() {
   els.aiAccessToken.addEventListener("change", () => {
     localStorage.setItem(AI_TOKEN_KEY, els.aiAccessToken.value.trim());
     setAiSyncStatus("Access key saved on this device.");
+    if (autoSyncEnabled) initializeAutomaticSync();
+  });
+  els.aiAutoSync.checked = localStorage.getItem(AI_AUTO_SYNC_KEY) === "true";
+  els.aiAutoSync.addEventListener("change", () => {
+    if (els.aiAutoSync.checked) {
+      autoSyncEnabled = true;
+      localStorage.setItem(AI_AUTO_SYNC_KEY, "true");
+      initializeAutomaticSync();
+    } else {
+      disableAutomaticSync("Automatic sync is off.");
+    }
   });
   els.aiPushButton.addEventListener("click", pushPlannerToCloud);
   els.aiPullButton.addEventListener("click", pullPlannerFromCloud);
+  if (els.aiAutoSync.checked) {
+    autoSyncEnabled = true;
+    initializeAutomaticSync();
+  }
   els.copyMuseConfigButton.addEventListener("click", async () => {
     try {
       const token = els.aiAccessToken.value.trim();
@@ -948,51 +973,14 @@ function bindEvents() {
     }
   });
 
-  els.monthSelect.addEventListener("change", () => {
-    state.month = Number(els.monthSelect.value);
-    selectFirstVisibleDate();
-    renderCalendar();
-  });
-
-  els.selectedDateInput.addEventListener("input", () => {
-    els.selectedDateInput.value = sanitizeDateDraft(els.selectedDateInput.value);
-  });
-  els.selectedDateInput.addEventListener("focus", () => {
-    if (!els.selectedDateInput.value) {
-      els.selectedDateInput.value = state.selectedDate || currentDateKey();
-    }
-  });
-  els.selectedDateInput.addEventListener("change", () => {
-    applyCalendarDateInput();
-  });
-  els.selectedDateInput.addEventListener("blur", () => {
-    applyCalendarDateInput();
-  });
-  els.selectedDateInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      applyCalendarDateInput();
-      els.selectedDateInput.blur();
-    }
-  });
-  els.selectedDatePickerButton.addEventListener("click", () => {
-    const nextDateKey = normalizeDateInput(els.selectedDateInput.value) || state.selectedDate || currentDateKey();
-    els.selectedDateInput.value = nextDateKey;
-    els.selectedDatePicker.value = nextDateKey;
+  els.calendarTitleButton.addEventListener("click", () => {
+    els.selectedDatePicker.value = state.selectedDate || currentDateKey();
     openNativePicker(els.selectedDatePicker);
   });
   els.selectedDatePicker.addEventListener("change", () => {
     const nextDateKey = normalizeDateInput(els.selectedDatePicker.value);
     if (!nextDateKey) return;
     setCalendarDate(nextDateKey);
-    renderCalendar();
-  });
-
-  els.yearInput.addEventListener("change", () => {
-    const nextYear = Number(els.yearInput.value);
-    state.year = Number.isFinite(nextYear) ? nextYear : new Date().getFullYear();
-    els.yearInput.value = state.year;
-    selectFirstVisibleDate();
     renderCalendar();
   });
 
@@ -1009,8 +997,6 @@ function bindEvents() {
     state.month = today.getMonth();
     state.year = today.getFullYear();
     state.selectedDate = toDateKey(today);
-    els.monthSelect.value = state.month;
-    els.yearInput.value = state.year;
     renderCalendar();
   });
 
@@ -1032,10 +1018,6 @@ function bindEvents() {
 
   els.specialTaskToggle.addEventListener("click", () => {
     togglePlannerPanel("specialTasksCollapsed", "special tasks");
-  });
-
-  els.calendarPanelToggle.addEventListener("click", () => {
-    togglePlannerPanel("calendarPanelCollapsed", "calendar");
   });
 
   els.timePanelToggle.addEventListener("click", () => {
@@ -1158,6 +1140,7 @@ function bindEvents() {
 
   /* Timer event bindings */
   els.timerStartButton.addEventListener("click", startTimer);
+  els.timerPauseButton.addEventListener("click", pauseTimer);
   els.timerStopButton.addEventListener("click", confirmStopTimer);
   els.timerContinueButton.addEventListener("click", continueTimer);
   els.timerEndButton.addEventListener("click", function () { stopTimer(true); });
@@ -1165,7 +1148,27 @@ function bindEvents() {
   els.timerStopSaveButton.addEventListener("click", saveAndStop);
   els.timerStopDiscardButton.addEventListener("click", discardAndStop);
   els.clearTimeEntriesButton.addEventListener("click", clearDayTimeEntries);
-  els.timerTaskSelect.addEventListener("change", renderTimerDisplay);
+  els.timerTaskSelect.addEventListener("change", () => {
+    renderTimerTaskChips();
+    renderTimerDisplay();
+  });
+  els.timePanel.addEventListener("dragover", (event) => {
+    if (!state.draggingSpecialTaskId || state.timer.status !== "idle") return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    els.timePanel.classList.add("is-task-drop-target");
+  });
+  els.timePanel.addEventListener("dragleave", (event) => {
+    if (els.timePanel.contains(event.relatedTarget)) return;
+    els.timePanel.classList.remove("is-task-drop-target");
+  });
+  els.timePanel.addEventListener("drop", (event) => {
+    if (!state.draggingSpecialTaskId) return;
+    event.preventDefault();
+    const task = state.data.savedCalendarTasks.find((item) => item.id === state.draggingSpecialTaskId);
+    clearSpecialTaskDrag();
+    if (task) trackSpecialTaskInTimer(task);
+  });
   els.timerSubtractButton.addEventListener("click", function () { adjustTimerDuration(-5 * 60); });
   els.timerAddButton.addEventListener("click", function () { adjustTimerDuration(5 * 60); });
   els.timeChartModeMergedButton.addEventListener("click", function () {
@@ -1175,6 +1178,10 @@ function bindEvents() {
     setTimeChartMode("sequence");
   });
   window.addEventListener("pagehide", endTimerForNavigation);
+  document.addEventListener("drop", (event) => {
+    const isPlannerDrag = Array.from(event.dataTransfer?.types || []).includes(DRAG_DATA_TYPE);
+    if (isPlannerDrag && event.target.closest?.("input, textarea")) event.preventDefault();
+  }, true);
 
   els.journalForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1352,6 +1359,7 @@ async function pushPlannerToCloud() {
     });
     if (!response.ok) throw new Error(response.status === 409 ? "Cloud data changed. Load it first, then try again." : "Cloud save failed.");
     const saved = await response.json();
+    if (autoSyncEnabled) recordAutomaticSync(saved.version);
     setAiSyncStatus(`Local planner copied to Cloudflare (version ${saved.version}).`);
   } catch (error) {
     setAiSyncStatus(error.message || "Cloud sync failed.");
@@ -1370,6 +1378,172 @@ async function pullPlannerFromCloud() {
     window.location.reload();
   } catch (error) {
     setAiSyncStatus(error.message || "Cloud sync failed.");
+  }
+}
+
+function disableAutomaticSync(message) {
+  autoSyncEnabled = false;
+  localStorage.removeItem(AI_AUTO_SYNC_KEY);
+  els.aiAutoSync.checked = false;
+  clearTimeout(autoSyncPushTimer);
+  clearInterval(autoSyncPollTimer);
+  autoSyncVersion = null;
+  lastSyncedSnapshot = null;
+  setAiSyncStatus(message);
+}
+
+function recordAutomaticSync(version, data = state.data) {
+  autoSyncVersion = version;
+  lastSyncedSnapshot = JSON.stringify(data);
+}
+
+function scheduleAutomaticPush() {
+  if (!autoSyncEnabled || !lastSyncedSnapshot || autoSyncBusy) return;
+  clearTimeout(autoSyncPushTimer);
+  autoSyncPushTimer = setTimeout(pushAutomaticChanges, 900);
+}
+
+async function initializeAutomaticSync() {
+  if (!autoSyncEnabled || autoSyncBusy) return;
+  if (window.location.protocol !== "https:") {
+    disableAutomaticSync("Automatic sync is available on the hosted HTTPS planner.");
+    return;
+  }
+
+  autoSyncBusy = true;
+  setAiSyncStatus("Connecting automatic sync…");
+  try {
+    const headers = aiAuthHeaders();
+    const initialSnapshot = JSON.stringify(state.data);
+    const response = await fetch("/api/planner", { headers });
+    if (!response.ok && response.status !== 404) {
+      throw new Error(response.status === 401 ? "Access key rejected. Check the key and try again." : "Could not connect to planner cloud.");
+    }
+
+    if (response.status === 404) {
+      const result = await fetch("/api/planner", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ data: JSON.parse(initialSnapshot), expectedVersion: 0 }),
+      });
+      if (!result.ok) throw new Error("Could not create the first cloud copy.");
+      const saved = await result.json();
+      recordAutomaticSync(saved.version, JSON.parse(initialSnapshot));
+    } else {
+      const remote = await response.json();
+      const localSnapshot = initialSnapshot;
+      const remoteSnapshot = JSON.stringify(remote.data);
+      if (localSnapshot !== remoteSnapshot) {
+        const sendLocal = window.confirm("This browser and the cloud copy differ. Send this browser's planner to the cloud? This replaces the existing cloud copy. Choose Cancel to keep automatic sync off and load cloud data first.");
+        if (!sendLocal) {
+          disableAutomaticSync("Copies differ. Automatic sync is off; review the cloud and browser copies first.");
+          return;
+        }
+        const savedResponse = await fetch("/api/planner", {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ data: state.data, expectedVersion: remote.version }),
+        });
+        if (!savedResponse.ok) throw new Error("The cloud copy changed during setup. Try again after checking both copies.");
+        const saved = await savedResponse.json();
+        recordAutomaticSync(saved.version);
+      } else {
+        recordAutomaticSync(remote.version);
+      }
+    }
+
+    setAiSyncStatus("Automatic sync is on.");
+    startAutomaticPolling();
+  } catch (error) {
+    if (error.message?.includes("Access key rejected")) disableAutomaticSync(error.message);
+    else {
+      setAiSyncStatus(error.message || "Automatic sync could not start.");
+      if (autoSyncEnabled) {
+        clearTimeout(autoSyncPollTimer);
+        autoSyncPollTimer = setTimeout(initializeAutomaticSync, 15000);
+      }
+    }
+  } finally {
+    autoSyncBusy = false;
+    if (autoSyncEnabled && lastSyncedSnapshot && JSON.stringify(state.data) !== lastSyncedSnapshot) scheduleAutomaticPush();
+  }
+}
+
+function startAutomaticPolling() {
+  clearInterval(autoSyncPollTimer);
+  autoSyncPollTimer = setInterval(checkForCloudChanges, 12000);
+  if (!autoSyncListenersBound) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && autoSyncEnabled) checkForCloudChanges();
+    });
+    window.addEventListener("focus", () => {
+      if (autoSyncEnabled) checkForCloudChanges();
+    });
+    autoSyncListenersBound = true;
+  }
+}
+
+async function pushAutomaticChanges() {
+  if (!autoSyncEnabled || autoSyncBusy || autoSyncVersion === null) return;
+  const snapshot = JSON.stringify(state.data);
+  if (snapshot === lastSyncedSnapshot) return;
+
+  autoSyncBusy = true;
+  try {
+    const response = await fetch("/api/planner", {
+      method: "PUT",
+      headers: aiAuthHeaders(),
+      body: JSON.stringify({ data: JSON.parse(snapshot), expectedVersion: autoSyncVersion }),
+    });
+    if (response.status === 409) {
+      localStorage.setItem(`${STORAGE_KEY}-sync-conflict`, snapshot);
+      disableAutomaticSync("Cloud and browser changed at the same time. Your browser copy is preserved; review both before syncing again.");
+      return;
+    }
+    if (!response.ok) throw new Error(response.status === 401 ? "Access key rejected. Automatic sync is paused." : "Could not save the latest planner changes.");
+    const saved = await response.json();
+    recordAutomaticSync(saved.version, JSON.parse(snapshot));
+    setAiSyncStatus("Automatic sync is on.");
+  } catch (error) {
+    if (error.message?.includes("Access key rejected")) disableAutomaticSync(error.message);
+    else setAiSyncStatus(error.message || "Automatic sync paused after a connection problem.");
+  } finally {
+    autoSyncBusy = false;
+    if (autoSyncEnabled && JSON.stringify(state.data) !== lastSyncedSnapshot) scheduleAutomaticPush();
+  }
+}
+
+async function checkForCloudChanges() {
+  if (!autoSyncEnabled || autoSyncBusy || document.visibilityState === "hidden") return;
+  autoSyncBusy = true;
+  try {
+    const response = await fetch("/api/planner", { headers: aiAuthHeaders() });
+    if (!response.ok) throw new Error(response.status === 401 ? "Access key rejected. Automatic sync is paused." : "Could not check for cloud changes.");
+    const remote = await response.json();
+    if (remote.version === autoSyncVersion) return;
+
+    const localSnapshot = JSON.stringify(state.data);
+    const remoteSnapshot = JSON.stringify(remote.data);
+    if (localSnapshot === remoteSnapshot) {
+      recordAutomaticSync(remote.version, remote.data);
+      return;
+    }
+    if (localSnapshot !== lastSyncedSnapshot) {
+      localStorage.setItem(`${STORAGE_KEY}-sync-conflict`, localSnapshot);
+      disableAutomaticSync("Cloud and browser changed at the same time. Your browser copy is preserved; review both before syncing again.");
+      return;
+    }
+
+    localStorage.setItem(`${STORAGE_KEY}-before-cloud-sync`, localStorage.getItem(STORAGE_KEY) || "{}");
+    localStorage.setItem(STORAGE_KEY, remoteSnapshot);
+    recordAutomaticSync(remote.version, remote.data);
+    setAiSyncStatus("Loaded Muse's latest planner changes.");
+    window.location.reload();
+  } catch (error) {
+    if (error.message?.includes("Access key rejected")) disableAutomaticSync(error.message);
+    else setAiSyncStatus(error.message || "Automatic sync could not check the cloud copy.");
+  } finally {
+    autoSyncBusy = false;
   }
 }
 
@@ -1443,7 +1617,7 @@ function renderSpecialTasks() {
   if (!state.data.savedCalendarTasks.length) {
     const empty = document.createElement("span");
     empty.className = "special-task-empty-message";
-    empty.textContent = "No special task created";
+    empty.textContent = "Add one with +";
     els.specialTaskList.append(empty);
     return;
   }
@@ -1455,79 +1629,120 @@ function renderSpecialTasks() {
 
 function makeSpecialTaskChip(task) {
   const chip = document.createElement("div");
-  chip.className = "special-task-chip";
+  chip.className = "special-task-tile";
   chip.dataset.taskId = task.id;
+  chip.draggable = true;
+  chip.tabIndex = 0;
+  chip.role = "button";
+  chip.title = `${task.text}\nDrag onto a day · double-click to rename`;
+  chip.setAttribute("aria-label", `Special task: ${task.text}`);
   const color = getCalendarTaskColor(task.color);
   chip.style.setProperty("--task-color", color.color);
   chip.style.setProperty("--task-tint", color.tint);
   let clickTimer = null;
 
-  const dragHandle = document.createElement("span");
-  dragHandle.className = "special-task-drag-handle";
-  dragHandle.draggable = true;
-  dragHandle.role = "button";
-  dragHandle.tabIndex = 0;
-  dragHandle.dataset.noEdit = "true";
-  dragHandle.setAttribute("aria-label", "Move special task");
-  dragHandle.addEventListener("click", (event) => event.stopPropagation());
-  dragHandle.addEventListener("dragstart", (event) => {
+  const label = document.createElement("span");
+  label.className = "special-task-label";
+  label.textContent = task.text;
+
+  const isControlTarget = (target) => Boolean(target.closest(".special-task-color-menu, .special-task-remove"));
+
+  const startEdit = () => {
+    if (chip.classList.contains("is-editing")) return;
+    chip.classList.add("is-editing");
+    chip.draggable = false;
+    const input = document.createElement("textarea");
+    input.className = "special-task-name";
+    input.rows = 2;
+    input.maxLength = 80;
+    input.value = task.text;
+    input.setAttribute("aria-label", `Rename special task: ${task.text}`);
+    let cancelled = false;
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("dblclick", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      }
+      if (event.key === "Escape") {
+        cancelled = true;
+        input.blur();
+      }
+    });
+    input.addEventListener("blur", () => {
+      chip.classList.remove("is-editing");
+      chip.draggable = true;
+      input.replaceWith(label);
+      if (!cancelled) saveSpecialTaskName(task.id, input.value);
+    });
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+  };
+
+  chip.addEventListener("dragstart", (event) => {
+    if (chip.classList.contains("is-editing") || isControlTarget(event.target)) {
+      event.preventDefault();
+      return;
+    }
+    state.draggingCalendarTask = null;
     state.draggingSpecialTaskId = task.id;
-    chip.classList.add("is-dragging");
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", task.id);
+    event.dataTransfer.effectAllowed = "copyMove";
+    event.dataTransfer.setData(DRAG_DATA_TYPE, task.id);
+    window.requestAnimationFrame(() => {
+      if (state.draggingSpecialTaskId !== task.id) return;
+      chip.classList.add("is-dragging");
+      document.body.classList.add("is-dragging-special-task");
+    });
   });
-  dragHandle.addEventListener("dragend", clearSpecialTaskDrag);
+  chip.addEventListener("dragend", clearSpecialTaskDrag);
 
   chip.addEventListener("dragover", (event) => {
     if (!state.draggingSpecialTaskId || state.draggingSpecialTaskId === task.id) return;
     event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
     chip.classList.add("is-drop-target");
   });
   chip.addEventListener("dragleave", () => {
     chip.classList.remove("is-drop-target");
   });
   chip.addEventListener("drop", (event) => {
+    if (!state.draggingSpecialTaskId) return;
     event.preventDefault();
-    chip.classList.remove("is-drop-target");
-    moveSpecialTask(event.dataTransfer.getData("text/plain") || state.draggingSpecialTaskId, task.id);
+    event.stopPropagation();
+    const draggedId = state.draggingSpecialTaskId;
     clearSpecialTaskDrag();
+    moveSpecialTask(draggedId, task.id);
   });
 
-  const nameInput = document.createElement("textarea");
-  nameInput.className = "special-task-name";
-  nameInput.rows = 1;
-  nameInput.value = task.text;
-  nameInput.title = "Click to add. Double-click to edit.";
-  nameInput.setAttribute("aria-label", `Special task: ${task.text}`);
-  enableDoubleClickInputEdit(nameInput, { onUnlock: () => resizeSpecialTaskName(nameInput) });
-  nameInput.addEventListener("input", () => {
-    resizeSpecialTaskName(nameInput);
-  });
-  nameInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      nameInput.blur();
-    }
-    if (event.key === "Escape") {
-      nameInput.value = task.text;
-      resizeSpecialTaskName(nameInput);
-      nameInput.blur();
-    }
-  });
-  nameInput.addEventListener("blur", () => {
-    saveSpecialTaskName(task.id, nameInput.value);
-  });
   chip.addEventListener("click", (event) => {
-    if (!nameInput.readOnly || event.target.closest(".special-task-color-menu, .special-task-remove, .special-task-drag-handle")) return;
+    if (chip.classList.contains("is-editing") || isControlTarget(event.target)) return;
     if (event.detail > 1) return;
-    clickTimer = window.setTimeout(() => addSpecialTaskToSelectedDate(task), 220);
+    clickTimer = window.setTimeout(() => {
+      clickTimer = null;
+      addSpecialTaskToDate(task);
+    }, 220);
   });
   chip.addEventListener("dblclick", (event) => {
-    if (event.target.closest(".special-task-color-menu, .special-task-remove, .special-task-drag-handle")) return;
+    if (isControlTarget(event.target)) return;
     event.preventDefault();
     if (clickTimer) {
       window.clearTimeout(clickTimer);
       clickTimer = null;
+    }
+    startEdit();
+  });
+  chip.addEventListener("keydown", (event) => {
+    if (event.target !== chip) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      addSpecialTaskToDate(task);
+    }
+    if (event.key === "F2") {
+      event.preventDefault();
+      startEdit();
     }
   });
 
@@ -1551,14 +1766,14 @@ function makeSpecialTaskChip(task) {
   const removeButton = document.createElement("button");
   removeButton.className = "special-task-remove";
   removeButton.type = "button";
-  removeButton.textContent = "x";
-  removeButton.setAttribute("aria-label", "Remove special task");
+  removeButton.textContent = "×";
+  removeButton.title = "Remove";
+  removeButton.setAttribute("aria-label", `Remove special task ${task.text}`);
   removeButton.addEventListener("click", () => {
     removeSpecialTask(task.id);
   });
 
-  chip.append(dragHandle, nameInput, colorMenu, removeButton);
-  resizeSpecialTaskNameSoon(nameInput);
+  chip.append(colorMenu, removeButton, label);
   return chip;
 }
 
@@ -1586,24 +1801,67 @@ function makeSpecialTaskColorGrid(task, menu) {
 }
 
 function addSpecialTask() {
-  const name = window.prompt("Special task name");
-  const text = name?.trim().slice(0, 80);
-  if (!text) return;
+  const existingDraft = els.specialTaskList.querySelector(".special-task-tile.is-draft textarea");
+  if (existingDraft) {
+    existingDraft.focus();
+    return;
+  }
 
-  if (hasSpecialTaskName(text)) return;
+  els.specialTaskList.querySelector(".special-task-empty-message")?.remove();
+  const draft = document.createElement("div");
+  draft.className = "special-task-tile is-draft is-editing";
+  const input = document.createElement("textarea");
+  input.className = "special-task-name";
+  input.rows = 2;
+  input.maxLength = 80;
+  input.placeholder = "Name";
+  input.setAttribute("aria-label", "New special task name");
+  let finished = false;
+  const finish = (save) => {
+    if (finished) return;
+    finished = true;
+    const text = input.value.trim().slice(0, 80);
+    if (save && text && !hasSpecialTaskName(text)) {
+      createSpecialTask(text);
+    } else {
+      renderSpecialTasks();
+    }
+  };
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true);
+    }
+    if (event.key === "Escape") {
+      finish(false);
+    }
+  });
+  input.addEventListener("blur", () => finish(true));
+  draft.append(input);
+  els.specialTaskList.append(draft);
+  input.focus();
+}
 
+function nextSpecialTaskColor() {
+  const used = new Set(state.data.savedCalendarTasks.map((task) => normalizeCalendarTaskColor(task.color)));
+  const free = calendarTaskColors.find((color) => color.id && !used.has(color.id));
+  return free ? free.id : "";
+}
+
+function createSpecialTask(text) {
   queueUndo("special task");
-  state.data.savedCalendarTasks.push({ id: makeId("saved-task"), text, color: "" });
+  state.data.savedCalendarTasks.push({ id: makeId("saved-task"), text, color: nextSpecialTaskColor() });
   state.data.savedCalendarTasks = normalizeSavedCalendarTasks(state.data.savedCalendarTasks);
   saveData();
   renderSpecialTasks();
 }
 
-function addSpecialTaskToSelectedDate(task) {
-  if (!state.selectedDate) return;
+function addSpecialTaskToDate(task, dateKey = state.selectedDate) {
+  if (!task || !dateKey) return null;
 
-  const notes = state.data.calendarNotes[state.selectedDate] || [];
-  if (notes.some((note) => note.specialTaskId === task.id)) return;
+  const notes = state.data.calendarNotes[dateKey] || [];
+  const existing = notes.find((note) => note.specialTaskId === task.id);
+  if (existing) return existing;
 
   queueUndo("calendar special task");
   const note = {
@@ -1616,14 +1874,25 @@ function addSpecialTaskToSelectedDate(task) {
     subtasks: [],
   };
   notes.push(note);
-  state.data.calendarNotes[state.selectedDate] = notes;
+  state.data.calendarNotes[dateKey] = notes;
   saveData();
   renderCalendar();
-  renderSelectedDateNotes();
-  if (state.timer.status === "idle") {
+  if (dateKey === state.selectedDate && state.timer.status === "idle") {
     els.timerTaskSelect.value = note.id;
+    renderTimerTaskChips();
     renderTimerDisplay();
   }
+  return note;
+}
+
+function trackSpecialTaskInTimer(task) {
+  if (state.timer.status !== "idle") return;
+  const note = addSpecialTaskToDate(task, state.selectedDate);
+  if (!note) return;
+  if (state.timeChartMode !== "merged") setTimeChartMode("merged");
+  els.timerTaskSelect.value = note.id;
+  renderTimerTaskChips();
+  renderTimerDisplay();
 }
 
 function saveSpecialTaskName(taskId, value) {
@@ -1702,9 +1971,11 @@ function moveSpecialTask(draggedId, targetId) {
 
 function clearSpecialTaskDrag() {
   state.draggingSpecialTaskId = null;
+  document.body.classList.remove("is-dragging-special-task");
   els.specialTaskList.querySelectorAll(".is-dragging, .is-drop-target").forEach((item) => {
     item.classList.remove("is-dragging", "is-drop-target");
   });
+  document.querySelectorAll(".is-task-drop-target").forEach((item) => item.classList.remove("is-task-drop-target"));
 }
 
 function removeSpecialTask(taskId) {
@@ -1744,18 +2015,16 @@ function applyPlannerPanelLayout() {
   const emojiCollapsed = Boolean(state.data.emojiCollapsed);
   const specialCollapsed = Boolean(state.data.specialTasksCollapsed);
   const taskCountCollapsed = Boolean(state.data.specialTaskTrackerCollapsed);
-  const calendarCollapsed = Boolean(state.data.calendarPanelCollapsed);
   const timerCollapsed = Boolean(state.data.timePanelCollapsed);
 
-  els.calendarLayout.dataset.calendarCollapsed = calendarCollapsed ? "true" : "false";
+  els.calendarLayout.dataset.timerCollapsed = timerCollapsed ? "true" : "false";
   els.emojiSection.dataset.panelCollapsed = emojiCollapsed ? "true" : "false";
   els.specialTaskShelf.dataset.panelCollapsed = specialCollapsed ? "true" : "false";
   els.specialTaskTrackerArea.dataset.panelCollapsed = taskCountCollapsed ? "true" : "false";
   els.timePanel.dataset.panelCollapsed = timerCollapsed ? "true" : "false";
-  els.calendarPanel.dataset.panelCollapsed = calendarCollapsed ? "true" : "false";
 
   els.timePanelToggle.textContent = timerCollapsed ? "‹" : "›";
-  els.calendarPanelToggle.textContent = calendarCollapsed ? "⌄" : "⌃";
+  els.timePanelToggle.title = timerCollapsed ? "Open timer" : "Close timer";
 
   els.emojiToggle.dataset.switchOn = emojiCollapsed ? "false" : "true";
   els.specialTaskToggle.dataset.switchOn = specialCollapsed ? "false" : "true";
@@ -1767,7 +2036,6 @@ function applyPlannerPanelLayout() {
   els.specialTaskToggle.setAttribute("aria-label", specialCollapsed ? "Show special tasks" : "Hide special tasks");
   els.specialTaskTrackerToggle.setAttribute("aria-label", taskCountCollapsed ? "Show task counts" : "Hide task counts");
   els.timePanelToggle.setAttribute("aria-label", timerCollapsed ? "Open timer" : "Close timer");
-  els.calendarPanelToggle.setAttribute("aria-label", calendarCollapsed ? "Open calendar" : "Close calendar");
 }
 
 function applyJournalLayout() {
@@ -1814,10 +2082,6 @@ function startJournalResize(event) {
   els.journalResizeHandle.addEventListener("pointercancel", stopResize);
 }
 
-function selectFirstVisibleDate() {
-  state.selectedDate = `${state.year}-${String(state.month + 1).padStart(2, "0")}-01`;
-}
-
 function shiftCalendarRange(direction) {
   const selectedDate = parseDateKey(state.selectedDate);
   if (state.range === "week") {
@@ -1842,21 +2106,7 @@ function setCalendarDate(dateKey) {
   state.selectedDate = dateKey;
   state.month = nextDate.getMonth();
   state.year = nextDate.getFullYear();
-  els.selectedDateInput.value = state.selectedDate;
   els.selectedDatePicker.value = state.selectedDate;
-  els.monthSelect.value = state.month;
-  els.yearInput.value = state.year;
-}
-
-function applyCalendarDateInput() {
-  const nextDateKey = normalizeDateInput(els.selectedDateInput.value);
-  if (!nextDateKey) {
-    els.selectedDateInput.value = state.selectedDate;
-    els.selectedDatePicker.value = state.selectedDate;
-    return;
-  }
-  setCalendarDate(nextDateKey);
-  renderCalendar();
 }
 
 function applyJournalFilterDateInput() {
@@ -2208,6 +2458,7 @@ function renderCalendar() {
   const { gridStart, totalDays } = getCalendarGridRange();
   els.calendarGrid.innerHTML = "";
   els.calendarGrid.classList.toggle("is-week-view", state.range === "week");
+  renderCalendarTitle(gridStart);
   renderSpecialTaskTracker(gridStart, totalDays);
 
   const todayKey = toDateKey(new Date());
@@ -2222,8 +2473,9 @@ function renderCalendar() {
     cell.classList.toggle("is-today", dateKey === todayKey);
     cell.classList.toggle("is-selected", dateKey === state.selectedDate);
     cell.addEventListener("dragover", (event) => {
-      if (!state.draggingCalendarTask) return;
+      if (!state.draggingCalendarTask && !state.draggingSpecialTaskId) return;
       event.preventDefault();
+      event.dataTransfer.dropEffect = state.draggingSpecialTaskId ? "copy" : "move";
       cell.classList.add("is-task-drop-target");
     });
     cell.addEventListener("dragleave", (event) => {
@@ -2233,6 +2485,12 @@ function renderCalendar() {
     cell.addEventListener("drop", (event) => {
       event.preventDefault();
       cell.classList.remove("is-task-drop-target");
+      if (state.draggingSpecialTaskId) {
+        const specialTask = state.data.savedCalendarTasks.find((item) => item.id === state.draggingSpecialTaskId);
+        clearSpecialTaskDrag();
+        addSpecialTaskToDate(specialTask, dateKey);
+        return;
+      }
       moveDraggedCalendarTask(dateKey);
     });
     cell.addEventListener("click", (event) => {
@@ -2268,6 +2526,37 @@ function renderCalendar() {
   }
 
   renderSelectedDateNotes();
+}
+
+function renderCalendarTitle(gridStart) {
+  const shortMonth = (date) => monthNames[date.getMonth()].slice(0, 3);
+  let title = `${monthNames[state.month]} ${state.year}`;
+  if (state.range === "week") {
+    const start = gridStart;
+    const end = addDays(gridStart, 6);
+    if (start.getFullYear() !== end.getFullYear()) {
+      title = `${shortMonth(start)} ${start.getDate()}, ${start.getFullYear()} – ${shortMonth(end)} ${end.getDate()}, ${end.getFullYear()}`;
+    } else if (start.getMonth() !== end.getMonth()) {
+      title = `${shortMonth(start)} ${start.getDate()} – ${shortMonth(end)} ${end.getDate()}, ${end.getFullYear()}`;
+    } else {
+      title = `${monthNames[start.getMonth()]} ${start.getDate()} – ${end.getDate()}, ${end.getFullYear()}`;
+    }
+  }
+  els.calendarTitle.textContent = title;
+}
+
+function renderSelectedDayHeading() {
+  const date = parseDateKey(state.selectedDate);
+  const today = parseDateKey(currentDateKey());
+  const dayOffset = Math.round((date - today) / 86400000);
+  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
+  const relative = { "-1": "Yesterday", 0: "Today", 1: "Tomorrow" }[dayOffset];
+  els.selectedDayEyebrow.textContent = relative ? `${relative} · ${weekday}` : weekday;
+  els.selectedDayTitle.textContent = date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    ...(date.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+  });
 }
 
 function renderSpecialTaskTracker(gridStart, totalDays) {
@@ -2345,7 +2634,7 @@ function renderSpecialTaskTracker(gridStart, totalDays) {
   if (!trackerTasks.length) {
     const empty = document.createElement("span");
     empty.className = "special-task-count-empty";
-    empty.textContent = "No task has been done";
+    empty.textContent = "None yet";
     els.specialTaskTracker.append(empty);
   }
 }
@@ -2541,6 +2830,10 @@ function moveDraggedCalendarTask(targetDateKey) {
 
   if (draggingTask.type === "goal-task") {
     moveGoalTaskDate(draggingTask.sectionId, draggingTask.goalId, targetDateKey);
+  }
+
+  if (draggingTask.type === "info-dump") {
+    moveInfoDumpTaskToCalendar(draggingTask.taskId, targetDateKey, { select: false });
   }
 
   clearCalendarTaskDrag();
@@ -2774,21 +3067,6 @@ function updateCalendarTaskText(dateKey, noteId, text) {
   }
 }
 
-function updateCalendarTaskTime(dateKey, noteId, timeValue) {
-  const note = (state.data.calendarNotes[dateKey] || []).find((item) => item.id === noteId);
-  if (!note) return;
-  const nextTime = normalizeTimeValue(timeValue);
-  if ((note.time || "") === nextTime) return;
-
-  queueUndo("calendar task time");
-  note.time = nextTime;
-  saveData();
-  renderCalendar();
-  if (dateKey === state.selectedDate) {
-    renderSelectedDateNotes();
-  }
-}
-
 function duplicateCalendarTask(dateKey, noteId) {
   const note = (state.data.calendarNotes[dateKey] || []).find((item) => item.id === noteId);
   if (!note) return;
@@ -2848,7 +3126,7 @@ function deleteInfoDumpTask(taskId) {
   renderInfoDump();
 }
 
-function moveInfoDumpTaskToCalendar(taskId, dateKey) {
+function moveInfoDumpTaskToCalendar(taskId, dateKey, { select = true } = {}) {
   const task = state.data.infoDumpTasks.find((item) => item.id === taskId);
   const targetDateKey = normalizeDateInput(dateKey) || state.selectedDate || currentDateKey();
   if (!task || !targetDateKey) return;
@@ -2866,7 +3144,7 @@ function moveInfoDumpTaskToCalendar(taskId, dateKey) {
     },
   ];
   state.data.infoDumpTasks = state.data.infoDumpTasks.filter((item) => item.id !== taskId);
-  setCalendarDate(targetDateKey);
+  if (select) setCalendarDate(targetDateKey);
   saveData();
   renderInfoDump();
   renderCalendar();
@@ -2911,9 +3189,9 @@ function makeInfoDumpRow(task) {
   item.classList.toggle("is-done", Boolean(task.done));
   item.dataset.infoDumpId = task.id;
 
-  const handleSpacer = document.createElement("span");
-  handleSpacer.className = "task-drag-handle info-dump-handle-spacer";
-  handleSpacer.setAttribute("aria-hidden", "true");
+  const handleSpacer = makeTaskDragHandle("info-dump", { taskId: task.id, task: item });
+  handleSpacer.title = "Drag onto a day";
+  handleSpacer.setAttribute("aria-label", "Drag onto a day");
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -2959,6 +3237,7 @@ function makeInfoDumpRow(task) {
 
   actions.append(makeInfoDumpDateControl(task), deleteButton);
   item.append(handleSpacer, checkbox, textWrap, actions);
+  enableTaskRowDrag(item, "info-dump", { taskId: task.id, task: item }, text);
   resizeWrappingTextboxSoon(text);
   return item;
 }
@@ -2977,71 +3256,6 @@ function makeTaskDuplicateButton(dateKey, noteId, customDuplicate) {
     duplicateCalendarTask(dateKey, noteId);
   });
   return button;
-}
-
-function makeTaskTimeMenu(dateKey, note) {
-  const menu = document.createElement("details");
-  menu.className = "task-time-menu";
-  menu.addEventListener("click", (event) => event.stopPropagation());
-
-  const summary = document.createElement("summary");
-  summary.className = "task-time-button";
-  summary.textContent = "◷";
-  summary.title = note.time ? `Time: ${normalizeTimeValue(note.time)}` : "Set time";
-  summary.setAttribute("aria-label", "Set task time");
-
-  const popover = document.createElement("div");
-  popover.className = "task-time-popover";
-
-  const input = document.createElement("input");
-  input.className = "task-time-input";
-  input.type = "text";
-  input.inputMode = "numeric";
-  input.maxLength = 5;
-  input.placeholder = "hh:mm";
-  input.value = normalizeTimeValue(note.time);
-  input.title = note.time ? `Time: ${normalizeTimeValue(note.time)}` : "Set time";
-  input.setAttribute("aria-label", "Set task time");
-  input.addEventListener("click", (event) => event.stopPropagation());
-  input.addEventListener("focus", () => {
-    if (!input.value) {
-      input.value = currentTimeValue();
-    }
-  });
-  input.addEventListener("input", () => {
-    input.value = sanitizeTimeDraft(input.value);
-  });
-  input.addEventListener("change", () => {
-    updateCalendarTaskTime(dateKey, note.id, input.value);
-    menu.open = false;
-  });
-  input.addEventListener("blur", () => {
-    input.value = normalizeTimeValue(input.value);
-  });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      updateCalendarTaskTime(dateKey, note.id, input.value);
-      input.blur();
-    }
-    if (event.key === "Escape") {
-      input.value = normalizeTimeValue(note.time);
-      menu.open = false;
-    }
-  });
-  menu.addEventListener("toggle", () => {
-    if (!menu.open) return;
-    if (!input.value) {
-      input.value = currentTimeValue();
-    }
-    window.requestAnimationFrame(() => {
-      input.focus();
-    });
-  });
-
-  popover.append(input);
-  menu.append(summary, popover);
-  return menu;
 }
 
 function makeTaskRow(note, dateKey, variant) {
@@ -3072,11 +3286,13 @@ function makeTaskRow(note, dateKey, variant) {
     renderSelectedDateNotes();
   });
 
-  const input = document.createElement("input");
+  const input = document.createElement("textarea");
   input.className = "task-text-input";
-  input.type = "text";
+  input.rows = 1;
   input.value = note.text;
+  input.title = note.text;
   input.readOnly = isSpecialCalendarTask;
+  input.addEventListener("input", () => resizeWrappingTextboxSoon(input));
   input.setAttribute("aria-label", isSpecialCalendarTask ? "Special task name" : "Edit task");
   if (isSpecialCalendarTask) {
     input.title = "Edit this name from the saved special task at the top";
@@ -3118,14 +3334,46 @@ function makeTaskRow(note, dateKey, variant) {
   const actions = document.createElement("div");
   actions.className = "calendar-task-actions";
   if (variant === "calendar") {
-    actions.append(makeTaskTimeMenu(dateKey, note), makeTaskDuplicateButton(dateKey, note.id), deleteButton);
+    actions.append(makeTaskDuplicateButton(dateKey, note.id), deleteButton);
   } else {
-    actions.append(makeTaskTimeMenu(dateKey, note), makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
+    actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
   }
 
   task.append(checkbox, textWrap, actions);
   task.append(makeSubtaskPanel(note, "calendar task", handleSubtaskChange));
+  enableTaskRowDrag(task, "calendar-task", { dateKey, noteId: note.id, task }, input);
+  resizeWrappingTextboxSoon(input);
   return task;
+}
+
+function enableTaskRowDrag(task, type, details, input) {
+  task.draggable = true;
+  task.addEventListener("pointerdown", (event) => {
+    const blocked = event.target.closest(".subtask-panel, .calendar-task-actions, input[type='checkbox']");
+    task.draggable = !blocked && document.activeElement !== input;
+  });
+  task.addEventListener("dragstart", (event) => {
+    if (event.target !== task) return;
+    // Only calendar days accept these; special task tiles and the timer ignore them.
+    state.draggingSpecialTaskId = null;
+    state.draggingCalendarTask = { type, ...details };
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(DRAG_DATA_TYPE, type);
+    window.requestAnimationFrame(() => {
+      if (state.draggingCalendarTask) task.classList.add("is-task-dragging");
+    });
+  });
+  task.addEventListener("dragend", clearCalendarTaskDrag);
+  if (input && !input.readOnly) {
+    task.addEventListener("click", (event) => {
+      if (document.activeElement === input || !event.target.closest(".task-text-wrap")) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+    input.addEventListener("blur", () => {
+      task.draggable = true;
+    });
+  }
 }
 
 function makeTaskDragHandle(type, details) {
@@ -3134,14 +3382,14 @@ function makeTaskDragHandle(type, details) {
   handle.draggable = true;
   handle.role = "button";
   handle.tabIndex = 0;
-  handle.title = "Drag to another date";
-  handle.setAttribute("aria-label", "Drag task to another date");
+  handle.title = "Drag onto a day";
+  handle.setAttribute("aria-label", "Drag task onto a day");
   handle.addEventListener("click", (event) => event.stopPropagation());
   handle.addEventListener("dragstart", (event) => {
     state.draggingCalendarTask = { type, ...details };
     details.task.classList.add("is-task-dragging");
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", type);
+    event.dataTransfer.setData(DRAG_DATA_TYPE, type);
   });
   handle.addEventListener("dragend", clearCalendarTaskDrag);
   return handle;
@@ -3308,8 +3556,21 @@ function bindDurationMaskInput(input, max, onChange) {
   });
 }
 
+function getTimerMinutes() {
+  const saved = Number(localStorage.getItem(TIMER_MINUTES_KEY));
+  if (!Number.isFinite(saved) || saved < minTimerMinutes || saved > maxTimerMinutes) return defaultTimerMinutes;
+  return Math.round(saved);
+}
+
+function setTimerMinutes(minutes) {
+  const next = Math.max(minTimerMinutes, Math.min(maxTimerMinutes, Math.round(minutes)));
+  localStorage.setItem(TIMER_MINUTES_KEY, String(next));
+  renderTimerPresets();
+  renderTimerDisplay();
+}
+
 function defaultTimerDurationSeconds() {
-  return (els.timerTaskSelect.value ? defaultTimerMinutes : defaultBreakMinutes) * 60;
+  return getTimerMinutes() * 60;
 }
 
 function formatCountdown(totalSeconds) {
@@ -3362,7 +3623,6 @@ function stopTick() {
 
 function startTimer() {
   if (state.timer.status === "running") return;
-  if (state.timer.status === "idle" && !els.timerTaskSelect.value && !getTimerSelectableTaskCount()) return;
   var seconds = defaultTimerDurationSeconds();
   ensureAudioContext();
 
@@ -3423,6 +3683,7 @@ function tickTimer() {
 function finishTimer() {
   state.timer.accumulatedSeconds = state.timer.durationSeconds;
   stopTimer(true);
+  playChime();
 }
 
 function endTimerForNavigation() {
@@ -3445,6 +3706,10 @@ function continueTimer() {
 }
 
 function adjustTimerDuration(deltaSeconds) {
+  if (state.timer.status === "idle") {
+    setTimerMinutes(getTimerMinutes() + deltaSeconds / 60);
+    return;
+  }
   if (state.timer.status !== "running" && state.timer.status !== "paused") return;
   var elapsed = liveElapsedSeconds();
   state.timer.durationSeconds = Math.max(elapsed, state.timer.durationSeconds + deltaSeconds);
@@ -3511,6 +3776,14 @@ function stopTimer(save) {
     });
   }
 
+  if (save && elapsed > 0) {
+    state.timerFlash = {
+      text: elapsed < 60 ? "Saved · under 1m" : "Saved · " + formatHoursMinutes(elapsed),
+      until: Date.now() + 4000,
+    };
+    window.setTimeout(renderTimerDisplay, 4100);
+  }
+
   state.timer.status = "idle";
   state.timer.taskId = "";
   state.timer.subtaskId = "";
@@ -3562,6 +3835,26 @@ function playAlarm() {
       beep(now + burst * 0.9 + i * 0.26, burst === 1 ? 660 : 880);
     }
   }
+}
+
+function playChime() {
+  ensureAudioContext();
+  var ctx = state.timer.audioContext;
+  if (!ctx) return;
+  var now = ctx.currentTime + 0.05;
+  [[0, 659.25], [0.22, 880]].forEach(function (note) {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = note[1];
+    gain.gain.setValueAtTime(0.0001, now + note[0]);
+    gain.gain.exponentialRampToValueAtTime(0.22, now + note[0] + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + note[0] + 0.7);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + note[0]);
+    osc.stop(now + note[0] + 0.75);
+  });
 }
 
 function stopAlarm() {
@@ -3661,33 +3954,18 @@ function shouldShowTimerEntry(dateKey, entry) {
   return isTimerTaskVisible(dateKey, entry.taskId);
 }
 
-function renderPieSlices(buckets, total) {
-  state.lastChartTotalSeconds = total;
+function renderTimeBar(buckets, total) {
+  els.timeBar.innerHTML = "";
+  els.timeBar.classList.toggle("is-empty", total <= 0);
 
-  els.timePieSlices.innerHTML = "";
-  var offset = 0;
   buckets.forEach(function (bucket) {
-    var fraction = total > 0 ? bucket.seconds / total : 0;
-
-    var slice = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    slice.setAttribute("class", "time-slice");
-    slice.setAttribute("cx", "60");
-    slice.setAttribute("cy", "60");
-    slice.setAttribute("r", String(PIE_RADIUS));
-    slice.setAttribute("transform", "rotate(-90 60 60)");
-    slice.setAttribute("stroke-dasharray", fraction * PIE_CIRCUMFERENCE + " " + PIE_CIRCUMFERENCE);
-    slice.setAttribute("stroke-dashoffset", -(offset * PIE_CIRCUMFERENCE));
-    slice.style.stroke = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
-
-    slice.addEventListener("pointerenter", function () {
-      els.timeChartTotal.textContent = formatHoursMinutes(bucket.seconds);
-    });
-    slice.addEventListener("pointerleave", function () {
-      els.timeChartTotal.textContent = formatHoursMinutes(state.lastChartTotalSeconds || 0);
-    });
-
-    els.timePieSlices.append(slice);
-    offset += fraction;
+    var label = bucket.key === "break" ? timeBreakLabel : bucket.label;
+    var segment = document.createElement("span");
+    segment.className = "time-bar-segment";
+    segment.style.flexGrow = String(bucket.seconds);
+    segment.style.background = bucket.key === "break" ? breakTrackColor.color : getCalendarTaskColor(bucket.color).color;
+    segment.title = label + " · " + formatHoursMinutes(bucket.seconds);
+    els.timeBar.append(segment);
   });
 
   els.timeChartTotal.textContent = formatHoursMinutes(total);
@@ -3696,9 +3974,9 @@ function renderPieSlices(buckets, total) {
       var label = bucket.key === "break" ? timeBreakLabel : bucket.label;
       return label + " " + formatHoursMinutes(bucket.seconds);
     }).join(", ");
-    els.timePieChart.setAttribute("aria-label", "Tracked time: " + labelText);
+    els.timeBar.setAttribute("aria-label", "Tracked time: " + labelText);
   } else {
-    els.timePieChart.setAttribute("aria-label", "No time tracked");
+    els.timeBar.setAttribute("aria-label", "No time tracked");
   }
 }
 
@@ -3983,12 +4261,14 @@ function deleteSequenceEntry(entryId) {
 function renderTimePie() {
   var buckets = getDayTimeBuckets(state.selectedDate);
   var total = buckets.reduce(function (sum, bucket) { return sum + bucket.seconds; }, 0);
-  els.timePanel.dataset.legendDensity = buckets.length <= 2 ? "sparse" : buckets.length <= 4 ? "medium" : "full";
+  els.timeTodayLabel.textContent = state.selectedDate === currentDateKey()
+    ? "Tracked today"
+    : "Tracked · " + parseDateKey(state.selectedDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   if (state.timeChartMode === "sequence") {
     renderTimeSequenceList(state.selectedDate);
   } else {
-    renderPieSlices(buckets, total);
+    renderTimeBar(buckets, total);
   }
 
   renderTimeLegend(buckets);
@@ -4003,7 +4283,6 @@ function setTimeChartMode(mode) {
     timeSequenceOutsideHandler = null;
   }
   els.timeChartArea.hidden = mode !== "merged";
-  els.timerControls.hidden = mode !== "merged";
   els.timerSession.hidden = mode !== "merged";
   els.timeSequenceList.hidden = mode !== "sequence";
   els.timeChartModeMergedButton.classList.toggle("is-active", mode === "merged");
@@ -4056,19 +4335,18 @@ function setTimePanelView(view) {
 /* Task selector */
 
 function getTimerSelectableTasks(dateKey = state.selectedDate) {
-  const activeSpecialTaskIds = new Set(state.data.savedCalendarTasks.map((task) => task.id));
-  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []).filter((note) =>
-    note.specialTaskId && activeSpecialTaskIds.has(note.specialTaskId),
-  );
+  return sortedCalendarTasks(state.data.calendarNotes[dateKey] || []);
 }
 
 function getTimerSelectableTaskCount(dateKey = state.selectedDate) {
   return getTimerSelectableTasks(dateKey).length;
 }
 
-function populateTaskSelectOptions(selectEl) {
+function populateTaskSelectOptions(selectEl, includeNoTask) {
   var tasks = getTimerSelectableTasks(state.selectedDate);
-  if (!tasks.length) {
+  if (includeNoTask) {
+    selectEl.append(makeOption("", timeBreakLabel));
+  } else if (!tasks.length) {
     var empty = makeOption("", emptyTimerTaskLabel);
     empty.disabled = true;
     empty.selected = true;
@@ -4089,7 +4367,7 @@ function renderTimerTaskSelect() {
   var isActive = state.timer.status !== "idle";
   var previousValue = isActive ? "" : els.timerTaskSelect.value;
   els.timerTaskSelect.innerHTML = "";
-  populateTaskSelectOptions(els.timerTaskSelect);
+  populateTaskSelectOptions(els.timerTaskSelect, true);
 
   if (isActive) {
     var activeValue = state.timer.taskId
@@ -4108,15 +4386,124 @@ function renderTimerTaskSelect() {
 
 /* Control renderers */
 
+var TIMER_RING_CIRCUMFERENCE = 2 * Math.PI * 52;
+
+function getTimerIdleSelection() {
+  var parts = (els.timerTaskSelect.value || "").split(":");
+  var note = parts[0]
+    ? (state.data.calendarNotes[state.selectedDate] || []).find(function (item) { return item.id === parts[0]; })
+    : null;
+  var subtask = note && parts[1]
+    ? (note.subtasks || []).find(function (item) { return item.id === parts[1]; })
+    : null;
+  return { note: note || null, subtask: subtask || null };
+}
+
 function renderTimerDisplay() {
-  var remaining = state.timer.status === "idle" ? defaultTimerDurationSeconds() : liveRemainingSeconds();
+  var status = state.timer.status;
+  var idle = status === "idle";
+  var duration = idle ? defaultTimerDurationSeconds() : state.timer.durationSeconds;
+  var remaining = idle ? duration : liveRemainingSeconds();
+  var fraction = duration > 0 ? Math.max(0, Math.min(1, remaining / duration)) : 0;
+  var selection = idle ? getTimerIdleSelection() : null;
+  var colorId = idle ? (selection.note ? selection.note.color : "") : state.timer.color;
+  var taskLabel = idle
+    ? (selection.subtask ? selection.subtask.text : selection.note ? selection.note.text : "")
+    : (state.timer.subtaskText || state.timer.taskText || "");
+  if (!taskLabel) taskLabel = timeBreakLabel;
+
   els.timerTimeText.textContent = formatCountdown(remaining);
+  els.timerRingProgress.style.strokeDasharray = String(TIMER_RING_CIRCUMFERENCE);
+  els.timerRingProgress.style.strokeDashoffset = String(TIMER_RING_CIRCUMFERENCE * (1 - fraction));
+  els.timerDisplay.dataset.status = status;
+  els.timePanel.style.setProperty(
+    "--timer-color",
+    normalizeCalendarTaskColor(colorId) ? getCalendarTaskColor(colorId).color : "var(--green)",
+  );
+  els.timerRingTask.textContent = taskLabel;
+  els.timerRingTask.title = taskLabel;
+
+  var flash = state.timerFlash && state.timerFlash.until > Date.now() ? state.timerFlash.text : "";
+  els.timerRingSub.textContent = {
+    idle: flash || "Ready",
+    running: "Focusing",
+    paused: "Paused",
+    finished: "Time is up",
+  }[status];
+
   els.timerStatusText.textContent = {
     idle: "Timer idle",
     running: "Timer running — " + formatCountdown(remaining) + " remaining",
     paused: "Timer paused",
     finished: "Time is up",
-  }[state.timer.status];
+  }[status];
+
+  document.title = status === "running" || status === "paused"
+    ? formatCountdown(remaining) + (status === "paused" ? " (paused)" : "") + (taskLabel ? " · " + taskLabel : "") + " — " + baseDocumentTitle
+    : baseDocumentTitle;
+}
+
+function renderTimerPresets() {
+  var current = getTimerMinutes();
+  var idle = state.timer.status === "idle";
+  els.timerPresets.innerHTML = "";
+  timerPresetMinutes.forEach(function (minutes) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "timer-preset";
+    button.classList.toggle("is-active", idle && minutes === current);
+    button.textContent = minutes + "m";
+    button.disabled = !idle;
+    button.setAttribute("aria-label", minutes + " minute session");
+    button.addEventListener("click", function () { setTimerMinutes(minutes); });
+    els.timerPresets.append(button);
+  });
+}
+
+function renderTimerTaskChips() {
+  var active = state.timer.status !== "idle";
+  var notes = state.data.calendarNotes[state.selectedDate] || [];
+  var options = Array.from(els.timerTaskSelect.options).filter(function (option) {
+    return !option.disabled;
+  });
+  els.timerTaskChips.innerHTML = "";
+
+  options.forEach(function (option) {
+    var parts = option.value.split(":");
+    var note = notes.find(function (item) { return item.id === parts[0]; });
+    var color = getCalendarTaskColor(note ? note.color : state.timer.color);
+    var chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "timer-task-chip";
+    chip.classList.toggle("is-subtask", Boolean(parts[1]));
+    chip.classList.toggle("is-no-task", !option.value);
+    chip.classList.toggle("is-active", option.value === els.timerTaskSelect.value);
+    chip.style.setProperty("--task-color", color.color);
+    chip.style.setProperty("--task-tint", color.tint);
+    chip.disabled = active;
+    chip.setAttribute("aria-pressed", option.value === els.timerTaskSelect.value ? "true" : "false");
+    var dot = document.createElement("span");
+    dot.className = "timer-task-chip-dot";
+    dot.setAttribute("aria-hidden", "true");
+    var text = document.createElement("span");
+    text.className = "timer-task-chip-text";
+    text.textContent = option.textContent.replace(/^— /, "");
+    chip.title = text.textContent;
+    chip.append(dot, text);
+    chip.addEventListener("click", function () {
+      els.timerTaskSelect.value = option.value;
+      renderTimerTaskChips();
+      renderTimerDisplay();
+    });
+    els.timerTaskChips.append(chip);
+  });
+
+  if (options.length <= 1) {
+    var hint = document.createElement("span");
+    hint.className = "timer-task-empty";
+    hint.textContent = "No tasks on this day";
+    els.timerTaskChips.append(hint);
+  }
 }
 
 function renderTimerControls() {
@@ -4124,22 +4511,25 @@ function renderTimerControls() {
   var confirming = state.timer.confirmStop;
   els.timerStartButton.hidden = confirming || status === "running" || status === "finished";
   els.timerStartButton.textContent = status === "paused" ? "Resume" : "Start";
+  els.timerPauseButton.hidden = confirming || status !== "running";
   els.timerStopButton.hidden = confirming || status === "idle" || status === "finished";
   els.timerFinishedControls.hidden = confirming || status !== "finished";
-  els.timerSubtractButton.hidden = confirming || (status !== "running" && status !== "paused");
-  els.timerAddButton.hidden = confirming || (status !== "running" && status !== "paused");
+  els.timerSubtractButton.disabled = confirming || status === "finished";
+  els.timerAddButton.disabled = confirming || status === "finished";
   els.timerStopConfirm.hidden = !confirming;
   els.clearTimeEntriesButton.hidden = !getDayTimeEntries(state.selectedDate).length;
   renderTimerTaskSelect();
-  els.timerStartButton.disabled = !confirming && status === "idle" && !getTimerSelectableTaskCount();
+  renderTimerTaskChips();
+  renderTimerPresets();
+  els.timerStartButton.disabled = false;
   if (confirming) {
     els.timerStatusText.textContent = "Confirm stop — " + formatHoursMinutes(liveElapsedSeconds()) + " tracked";
   }
 }
 
 function renderSelectedDateNotes() {
-  els.selectedDateInput.value = state.selectedDate;
   els.selectedDatePicker.value = state.selectedDate;
+  renderSelectedDayHeading();
   renderEmojiPalette();
   els.selectedDateNotes.innerHTML = "";
   const notes = sortedCalendarTasks(state.data.calendarNotes[state.selectedDate] || []);
@@ -4298,7 +4688,7 @@ function renderGoals() {
       state.draggingGoalSectionId = section.id;
       card.classList.add("is-dragging");
       event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", section.id);
+      event.dataTransfer.setData(DRAG_DATA_TYPE, section.id);
     });
     sectionDragHandle.addEventListener("dragend", () => {
       state.draggingGoalSectionId = null;
@@ -4334,7 +4724,7 @@ function renderGoals() {
       }
       event.preventDefault();
       card.classList.remove("is-drop-target");
-      moveGoalSection(event.dataTransfer.getData("text/plain") || state.draggingGoalSectionId, section.id);
+      moveGoalSection(event.dataTransfer.getData(DRAG_DATA_TYPE) || state.draggingGoalSectionId, section.id);
     });
 
     titleInput.addEventListener("keydown", (event) => {
@@ -4382,6 +4772,7 @@ function renderGoals() {
       saveData();
       renderGoals();
       renderCalendar();
+      els.goalSections.querySelector(`[data-section-id="${section.id}"] .goal-form input`)?.focus();
     });
 
     goalList.addEventListener("dragover", (event) => {
@@ -4528,32 +4919,6 @@ function resizeWrappingTextboxSoon(input) {
   window.requestAnimationFrame(() => resizeWrappingTextbox(input));
 }
 
-function resizeSpecialTaskName(input) {
-  const styles = window.getComputedStyle(input);
-  const measure = input.ownerDocument.createElement("span");
-  measure.textContent = input.value || " ";
-  measure.style.position = "absolute";
-  measure.style.visibility = "hidden";
-  measure.style.pointerEvents = "none";
-  measure.style.whiteSpace = "nowrap";
-  measure.style.font = styles.font;
-  measure.style.letterSpacing = styles.letterSpacing;
-  input.ownerDocument.body.append(measure);
-
-  const horizontalPadding =
-    Number.parseFloat(styles.paddingLeft || "0") + Number.parseFloat(styles.paddingRight || "0");
-  const nextWidth = Math.min(Math.max(Math.ceil(measure.scrollWidth + horizontalPadding + 2), 78), 250);
-  measure.remove();
-
-  input.style.width = `${nextWidth}px`;
-  resizeWrappingTextbox(input);
-}
-
-function resizeSpecialTaskNameSoon(input) {
-  resizeSpecialTaskName(input);
-  window.requestAnimationFrame(() => resizeSpecialTaskName(input));
-}
-
 function resizeGoalGroupName(input) {
   const styles = window.getComputedStyle(input);
   const measure = input.ownerDocument.createElement("span");
@@ -4633,7 +4998,7 @@ function renderGoalGroupTabs() {
       state.draggingGoalGroupId = group.id;
       tab.classList.add("is-dragging");
       event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", group.id);
+      event.dataTransfer.setData(DRAG_DATA_TYPE, group.id);
     });
     dragHandle.addEventListener("dragend", clearGoalGroupDrag);
     tab.addEventListener("dragover", (event) => {
@@ -4647,7 +5012,7 @@ function renderGoalGroupTabs() {
     tab.addEventListener("drop", (event) => {
       event.preventDefault();
       tab.classList.remove("is-drop-target");
-      moveGoalGroup(event.dataTransfer.getData("text/plain") || state.draggingGoalGroupId, group.id);
+      moveGoalGroup(event.dataTransfer.getData(DRAG_DATA_TYPE) || state.draggingGoalGroupId, group.id);
       clearGoalGroupDrag();
     });
 
@@ -4726,25 +5091,33 @@ function renderGoalGroupTabs() {
 }
 
 function renderGoalItem(section, goal) {
+  // A goal is a plain bullet line: text you can edit, reorder, or remove.
   const item = document.createElement("li");
   item.className = "goal-item";
-  item.classList.toggle("is-done", goal.done);
   item.dataset.goalId = goal.id;
 
-  const dragHandle = document.createElement("span");
-  dragHandle.className = "goal-item-drag-handle";
-  dragHandle.draggable = true;
-  dragHandle.role = "button";
-  dragHandle.tabIndex = 0;
-  dragHandle.title = "Drag to move goal";
-  dragHandle.setAttribute("aria-label", "Drag goal to move");
-  dragHandle.addEventListener("dragstart", (event) => {
+  const removeGoal = () => {
+    if (!section.goals.includes(goal)) return;
+    queueUndo("goal deletion");
+    section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
+    saveData();
+    item.remove();
+    renderCalendar();
+  };
+
+  const bullet = document.createElement("span");
+  bullet.className = "goal-bullet";
+  bullet.draggable = true;
+  bullet.title = "Drag to reorder";
+  bullet.setAttribute("aria-hidden", "true");
+  bullet.addEventListener("dragstart", (event) => {
     state.draggingGoalItem = { sectionId: section.id, goalId: goal.id };
     item.classList.add("is-goal-dragging");
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", goal.id);
+    event.dataTransfer.setData(DRAG_DATA_TYPE, goal.id);
+    event.dataTransfer.setDragImage(item, 8, 12);
   });
-  dragHandle.addEventListener("dragend", clearGoalItemDrag);
+  bullet.addEventListener("dragend", clearGoalItemDrag);
 
   item.addEventListener("dragover", (event) => {
     const dragging = state.draggingGoalItem;
@@ -4759,21 +5132,9 @@ function renderGoalItem(section, goal) {
     event.preventDefault();
     event.stopPropagation();
     item.classList.remove("is-goal-drop-target");
-    const draggedId = event.dataTransfer.getData("text/plain") || state.draggingGoalItem?.goalId;
+    const draggedId = event.dataTransfer.getData(DRAG_DATA_TYPE) || state.draggingGoalItem?.goalId;
     moveGoalToSection(state.draggingGoalItem?.sectionId, draggedId, section.id, goal.id);
     clearGoalItemDrag();
-  });
-
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.checked = goal.done;
-  checkbox.setAttribute("aria-label", "Mark goal complete");
-  checkbox.addEventListener("change", () => {
-    queueUndo("goal status");
-    goal.done = checkbox.checked;
-    saveData();
-    renderGoals();
-    renderCalendar();
   });
 
   const text = document.createElement("textarea");
@@ -4784,120 +5145,132 @@ function renderGoalItem(section, goal) {
   text.addEventListener("input", () => {
     resizeWrappingTextboxSoon(text);
   });
-  text.addEventListener("change", () => {
-    const nextText = text.value.trim();
-    if (!nextText) {
-      queueUndo("goal deletion");
-      section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
-    } else if (goal.text !== nextText) {
-      queueUndo("goal edit");
-      goal.text = nextText;
-    }
+  // Lines behave like a document: Enter starts a new bullet, Backspace at the
+  // start joins with the line above, and the arrow keys move between lines.
+  let restructuring = false;
+  const restructure = (label, change, focusGoalId, focusPosition) => {
+    restructuring = true;
+    queueUndo(label);
+    change();
     saveData();
     renderGoals();
     renderCalendar();
-  });
-  text.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      text.blur();
-    }
-  });
-
-  const actions = document.createElement("div");
-  actions.className = "goal-item-actions";
-
-  const dateControl = document.createElement("span");
-  dateControl.className = "goal-date-picker-control";
-  dateControl.addEventListener("click", (event) => event.stopPropagation());
-
-  const dateButton = document.createElement("button");
-  dateButton.className = "goal-date-button";
-  dateButton.type = "button";
-  dateButton.textContent = "◷";
-  dateButton.title = goal.dueDate ? `Date: ${goal.dueDate}` : "Set date";
-  dateButton.setAttribute("aria-label", "Set goal calendar date");
-
-  const nativeDateInput = document.createElement("input");
-  nativeDateInput.className = "native-picker-input";
-  nativeDateInput.type = "date";
-  nativeDateInput.tabIndex = -1;
-  nativeDateInput.setAttribute("aria-hidden", "true");
-  nativeDateInput.value = goal.dueDate || "";
-
-  const applyGoalDate = (nextDateKey) => {
-    if (goal.dueDate === nextDateKey) return;
-    queueUndo("goal date");
-    goal.dueDate = nextDateKey;
-    nativeDateInput.value = goal.dueDate;
-    setCalendarDate(goal.dueDate);
-    saveData();
-    renderGoals();
-    renderCalendar();
-    renderSelectedDateNotes();
+    focusGoalText(section.id, focusGoalId, focusPosition);
   };
 
-  dateButton.addEventListener("click", () => {
-    const nextDateKey = goal.dueDate || currentDateKey();
-    if (!goal.dueDate) {
-      applyGoalDate(nextDateKey);
+  text.addEventListener("change", () => {
+    if (restructuring) return;
+    const nextText = text.value.trim();
+    if (nextText && goal.text !== nextText) {
+      queueUndo("goal edit");
+      goal.text = nextText;
+      saveData();
+      renderCalendar();
+    }
+  });
+  text.addEventListener("blur", () => {
+    if (restructuring) return;
+    if (!text.value.trim()) {
+      removeGoal();
+    } else if (text.value !== goal.text) {
+      text.value = goal.text;
+      resizeWrappingTextboxSoon(text);
+    }
+  });
+  text.addEventListener("keydown", (event) => {
+    const caretStart = text.selectionStart;
+    const caretEnd = text.selectionEnd;
+    const index = section.goals.indexOf(goal);
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const before = text.value.slice(0, caretStart).trim();
+      const after = text.value.slice(caretEnd).trim();
+      if (!before && !after) {
+        text.blur();
+        return;
+      }
+      const newGoal = { id: makeId("goal"), text: "", done: false, dueDate: "", subtasks: [] };
+      if (before) {
+        newGoal.text = after;
+        restructure("goal edit", () => {
+          goal.text = before;
+          section.goals.splice(index + 1, 0, newGoal);
+        }, newGoal.id, 0);
+      } else {
+        restructure("goal edit", () => {
+          goal.text = after;
+          section.goals.splice(index, 0, newGoal);
+        }, goal.id, 0);
+      }
       return;
     }
-    nativeDateInput.value = nextDateKey;
-    openNativePicker(nativeDateInput);
+
+    if (event.key === "Backspace" && caretStart === 0 && caretEnd === 0) {
+      const previous = section.goals[index - 1];
+      const current = text.value.trim();
+      if (!previous) {
+        if (!current) {
+          event.preventDefault();
+          const next = section.goals[index + 1];
+          restructure("goal deletion", () => {
+            section.goals.splice(index, 1);
+          }, next ? next.id : "", 0);
+        }
+        return;
+      }
+      event.preventDefault();
+      const joinAt = previous.text.length + (current && previous.text ? 1 : 0);
+      restructure("goal edit", () => {
+        previous.text = [previous.text, current].filter(Boolean).join(" ");
+        section.goals.splice(index, 1);
+      }, previous.id, current ? joinAt : "end");
+      return;
+    }
+
+    if (event.key === "ArrowUp" && caretStart === 0 && caretEnd === 0) {
+      const target = item.previousElementSibling?.querySelector(".goal-text-input");
+      if (!target) return;
+      event.preventDefault();
+      target.focus();
+      target.setSelectionRange(target.value.length, target.value.length);
+    }
+
+    if (event.key === "ArrowDown" && caretStart === text.value.length && caretEnd === text.value.length) {
+      const target = item.nextElementSibling?.querySelector(".goal-text-input");
+      if (!target) return;
+      event.preventDefault();
+      target.focus();
+      target.setSelectionRange(0, 0);
+    }
   });
-  nativeDateInput.addEventListener("change", () => {
-    const nextDateKey = normalizeDateInput(nativeDateInput.value);
-    if (!nextDateKey) return;
-    applyGoalDate(nextDateKey);
-  });
-  dateControl.append(dateButton, nativeDateInput);
 
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
-  deleteButton.textContent = "x";
+  deleteButton.textContent = "×";
   deleteButton.className = "goal-delete-button";
+  deleteButton.title = "Remove";
   deleteButton.setAttribute("aria-label", "Delete goal");
   deleteButton.addEventListener("click", () => {
-    queueUndo("goal deletion");
-    section.goals = section.goals.filter((itemGoal) => itemGoal.id !== goal.id);
-    saveData();
-    renderGoals();
-    renderCalendar();
+    restructuring = true;
+    removeGoal();
     renderSelectedDateNotes();
   });
 
-  const dateBadge = document.createElement("span");
-  dateBadge.className = "goal-date-badge";
-  dateBadge.textContent = goal.dueDate || "";
-  dateBadge.hidden = !goal.dueDate;
-  dateBadge.title = "Double-click to remove date";
-  dateBadge.addEventListener("dblclick", () => {
-    queueUndo("goal date removal");
-    goal.dueDate = "";
-    saveData();
-    renderGoals();
-    renderCalendar();
-    renderSelectedDateNotes();
-  });
-
-  const textWrap = document.createElement("div");
-  textWrap.className = "goal-text-wrap";
-  const goalLine = document.createElement("div");
-  goalLine.className = "goal-title-row";
-  const handleSubtaskChange = () => {
-    saveData();
-    renderGoals();
-    renderCalendar();
-    renderSelectedDateNotes();
-  };
-  actions.append(makeSubtaskAddButton(goal, "goal", handleSubtaskChange), dateControl, deleteButton);
-  goalLine.append(text);
-  textWrap.append(goalLine, dateBadge, makeSubtaskPanel(goal, "goal", handleSubtaskChange));
-
-  item.append(dragHandle, checkbox, textWrap, actions);
+  item.append(bullet, text, deleteButton);
   resizeWrappingTextboxSoon(text);
   return item;
+}
+
+function focusGoalText(sectionId, goalId, position) {
+  if (!goalId) return;
+  const input = els.goalSections.querySelector(
+    `[data-section-id="${sectionId}"] [data-goal-id="${goalId}"] .goal-text-input`,
+  );
+  if (!input) return;
+  input.focus();
+  const caret = position === "end" ? input.value.length : Math.min(position, input.value.length);
+  input.setSelectionRange(caret, caret);
 }
 
 function moveGoalToSection(sourceSectionId, draggedId, targetSectionId, targetId = "") {

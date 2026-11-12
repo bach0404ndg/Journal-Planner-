@@ -9,12 +9,10 @@
   <body>
     <main class="app-shell">
       <header class="topbar">
-        <div>
-          <h1>YOUR PLANNER</h1>
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <h1>Your Planner</h1>
         </div>
-      </header>
-
-      <div class="section-switcher">
         <nav class="tabs" aria-label="Planner sections">
           <button class="tab is-active" type="button" data-view="calendar">Calendar</button>
           <button class="tab" type="button" data-view="goals">Goals</button>
@@ -32,6 +30,10 @@
             <div class="ai-access-panel">
               <label for="aiAccessToken">Access key</label>
               <input id="aiAccessToken" type="password" autocomplete="off" placeholder="Cloudflare access key">
+              <label class="ai-auto-sync-toggle" for="aiAutoSync">
+                <input id="aiAutoSync" type="checkbox">
+                <span>Automatic sync</span>
+              </label>
               <div class="ai-access-actions">
                 <button class="metadata-button" id="aiPushButton" type="button">Send local data</button>
                 <button class="metadata-button" id="aiPullButton" type="button">Load cloud data</button>
@@ -42,152 +44,150 @@
             </div>
           </details>
         </div>
-      </div>
+      </header>
 
       <section class="view is-active" id="calendarView" aria-label="Calendar">
         <div class="calendar-layout" id="calendarLayout">
-          <aside class="side-panel" aria-label="Calendar task editor">
-            <div class="side-panel-split">
-              <div class="side-panel-main">
-                <div class="task-section-title info-dump-heading">Info Dump</div>
-                <section class="task-column info-dump-panel" aria-label="Info Dump">
-                  <form id="infoDumpForm" class="task-entry-form">
-                    <label>
-                      <input id="infoDumpInput" type="text" placeholder="Add and press Enter" aria-label="Add info dump task">
-                    </label>
-                  </form>
-                  <div class="mini-list info-dump-list" id="infoDumpList"></div>
-                </section>
-                <div class="task-section-title daily-task-heading">Daily Task</div>
-                <div class="calendar-date-controls" aria-label="Calendar date controls">
-                  <label>
-                    <span>Date</span>
-                    <div class="picker-input-row">
-                      <input id="selectedDateInput" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy-mm-dd">
-                      <button class="picker-open-button" id="selectedDatePickerButton" type="button" aria-label="Open calendar date picker">▦</button>
-                      <input class="native-picker-input" id="selectedDatePicker" type="date" tabindex="-1" aria-hidden="true">
-                    </div>
-                  </label>
-                  <label>
-                    <span>Month</span>
-                    <select id="monthSelect"></select>
-                  </label>
-                  <label>
-                    <span>Year</span>
-                    <input id="yearInput" type="number" min="1970" max="2099" inputmode="numeric">
-                  </label>
-                  <button class="ghost-button" type="button" id="todayButton">Today</button>
-                  <button class="cleanup-button" type="button" id="calendarRemoveOldDataButton">Remove old data</button>
-                </div>
-                <div class="emoji-section" id="emojiSection" aria-label="Day emoji markers">
-                  <div class="emoji-palette" id="emojiPalette"></div>
-                  <button class="display-switch emoji-display-switch" id="emojiToggle" type="button" aria-label="Hide emoji markers" aria-pressed="true"></button>
-                </div>
-                <div class="side-panel-tasks">
-                  <div class="stacked-form">
-                    <div class="special-task-shelf" id="specialTaskShelf" aria-label="Special calendar tasks">
-                      <div class="special-task-shelf-content">
-                        <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task">+</button>
-                        <div class="special-task-list" id="specialTaskList"></div>
-                      </div>
-                      <button class="display-switch special-task-display-switch" id="specialTaskToggle" type="button" aria-label="Hide special tasks" aria-pressed="true"></button>
-                    </div>
-                  </div>
-                  <div class="task-stack">
-                    <section class="task-column dated-task-panel" aria-label="Selected day tasks">
-                      <form id="calendarNoteForm" class="task-entry-form">
-                        <label>
-                          <input id="calendarNoteInput" type="text" placeholder="Add a task and press Enter" aria-label="Add daily task">
-                        </label>
-                      </form>
-                      <div class="mini-list" id="selectedDateNotes"></div>
-                    </section>
-                  </div>
-                </div>
+          <aside class="rail" aria-label="Tasks">
+            <section class="card special-task-shelf" id="specialTaskShelf" aria-label="Special tasks">
+              <header class="card-head">
+                <h2>Special tasks</h2>
+                <span class="card-hint">Drag onto a day</span>
+                <button class="display-switch special-task-display-switch" id="specialTaskToggle" type="button" aria-label="Hide special tasks" aria-pressed="true"></button>
+              </header>
+              <div class="special-task-shelf-content">
+                <div class="special-task-list" id="specialTaskList"></div>
+                <button class="special-task-add" id="addSpecialTaskButton" type="button" aria-label="Add special task" title="New special task">+</button>
               </div>
+            </section>
 
-              <section class="time-panel" id="timePanel" aria-label="Time tracking">
-                <button class="panel-collapse-toggle time-panel-toggle" id="timePanelToggle" type="button" aria-label="Close timer">‹</button>
-                <div class="time-panel-head">
-                  <h2 class="time-panel-title">Time Tracker</h2>
-                  <button class="cleanup-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
+            <section class="card day-card" aria-label="Selected day tasks">
+              <header class="card-head">
+                <div class="card-title-stack">
+                  <span class="card-eyebrow" id="selectedDayEyebrow">Today</span>
+                  <h2 id="selectedDayTitle"></h2>
                 </div>
+                <button class="display-switch emoji-display-switch" id="emojiToggle" type="button" aria-label="Hide emoji markers" aria-pressed="true" title="Day markers"></button>
+              </header>
+              <div class="emoji-section" id="emojiSection" aria-label="Day emoji markers">
+                <div class="emoji-palette" id="emojiPalette"></div>
+              </div>
+              <form id="calendarNoteForm" class="task-entry-form">
+                <input id="calendarNoteInput" type="text" placeholder="Add a task" aria-label="Add daily task">
+              </form>
+              <div class="mini-list" id="selectedDateNotes" data-empty="No tasks yet"></div>
+            </section>
 
-                <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Time Tracker view">
-                  <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Timer</button>
-                  <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">History</button>
-                </div>
-
-                <div class="time-chart-area" id="timeChartArea">
-                  <div class="time-chart">
-                    <svg id="timePieChart" viewBox="0 0 120 120" role="img" aria-label="Tracked time pie chart">
-                      <circle class="time-chart-track" cx="60" cy="60" r="45" fill="none"></circle>
-                      <g id="timePieSlices"></g>
-                    </svg>
-                    <div class="time-chart-center">
-                      <span class="time-chart-total" id="timeChartTotal">0h 0m</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="time-sequence-list" id="timeSequenceList" hidden></div>
-
-                <div class="timer-session" id="timerSession">
-                  <div class="timer-row">
-                    <label>
-                      <span>Track</span>
-                      <select id="timerTaskSelect" aria-label="Task to track"></select>
-                    </label>
-                  </div>
-                  <div class="timer-display-row">
-                    <button class="timer-adjust-button" type="button" id="timerSubtractButton" aria-label="Subtract 5 minutes" hidden>−</button>
-                    <div class="timer-display" id="timerDisplay">
-                      <span id="timerTimeText" aria-hidden="true">00:00</span>
-                      <span class="sr-only" id="timerStatusText" aria-live="polite">Timer idle</span>
-                    </div>
-                    <button class="timer-adjust-button" type="button" id="timerAddButton" aria-label="Add 5 minutes" hidden>+</button>
-                  </div>
-                  <div class="timer-controls" id="timerControls">
-                    <div class="time-legend" id="timeLegend"></div>
-                  </div>
-                  <div class="timer-buttons">
-                    <button class="primary-button timer-main-button" type="button" id="timerStartButton">Start</button>
-                    <button class="ghost-button timer-main-button" type="button" id="timerStopButton" hidden>Stop</button>
-                  </div>
-                  <div class="timer-finished" id="timerFinishedControls" hidden>
-                    <span>Time is up!</span>
-                    <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
-                    <button class="primary-button" type="button" id="timerEndButton">End</button>
-                  </div>
-                  <div class="timer-stop-confirm" id="timerStopConfirm" hidden>
-                    <span>Save tracked time?</span>
-                    <button class="ghost-button" type="button" id="timerStopResumeButton">Resume</button>
-                    <button class="primary-button" type="button" id="timerStopSaveButton">Save</button>
-                    <button class="ghost-button" type="button" id="timerStopDiscardButton">Discard</button>
-                  </div>
-                </div>
-              </section>
-            </div>
+            <section class="card info-dump-panel" aria-label="Info Dump">
+              <header class="card-head">
+                <h2>Info dump</h2>
+                <span class="card-hint">Drag onto a day</span>
+              </header>
+              <form id="infoDumpForm" class="task-entry-form">
+                <input id="infoDumpInput" type="text" placeholder="Add a note" aria-label="Add info dump task">
+              </form>
+              <div class="mini-list info-dump-list" id="infoDumpList"></div>
+            </section>
           </aside>
 
-          <section class="calendar-panel" id="calendarPanel" aria-label="Monthly calendar">
-            <button class="panel-collapse-toggle calendar-panel-toggle" id="calendarPanelToggle" type="button" aria-label="Close calendar">⌃</button>
+          <section class="card calendar-panel" id="calendarPanel" aria-label="Calendar">
             <div class="calendar-panel-top">
-              <div class="range-switch" aria-label="Calendar range">
-                <button class="range-button" type="button" data-range="month">Monthly</button>
-                <button class="range-button is-active" type="button" data-range="week">Weekly</button>
-              </div>
-              <div class="special-task-tracker-area" id="specialTaskTrackerArea">
-                <button class="display-switch special-task-tracker-toggle" id="specialTaskTrackerToggle" type="button" aria-label="Hide task counts" aria-pressed="true"></button>
-                <div class="special-task-tracker" id="specialTaskTracker" aria-label="Special task counts"></div>
-              </div>
               <div class="calendar-nav-buttons" aria-label="Calendar navigation">
-                <button class="metadata-button calendar-arrow-button" type="button" id="calendarPrevButton" aria-label="Previous calendar range">&lt;</button>
-                <button class="metadata-button calendar-arrow-button" type="button" id="calendarNextButton" aria-label="Next calendar range">&gt;</button>
+                <button class="icon-quiet-button calendar-arrow-button" type="button" id="calendarPrevButton" aria-label="Previous calendar range">‹</button>
+                <button class="icon-quiet-button calendar-arrow-button" type="button" id="calendarNextButton" aria-label="Next calendar range">›</button>
               </div>
+              <div class="calendar-title-wrap">
+                <button class="calendar-title" type="button" id="calendarTitleButton" title="Jump to a date">
+                  <span id="calendarTitle"></span>
+                </button>
+                <input class="native-picker-input" id="selectedDatePicker" type="date" tabindex="-1" aria-hidden="true">
+              </div>
+              <button class="quiet-button" type="button" id="todayButton">Today</button>
+              <div class="range-switch" aria-label="Calendar range">
+                <button class="range-button is-active" type="button" data-range="week">Week</button>
+                <button class="range-button" type="button" data-range="month">Month</button>
+              </div>
+              <details class="entry-menu calendar-more-menu">
+                <summary aria-label="More calendar options" title="More">⋯</summary>
+                <div class="entry-menu-items">
+                  <button class="danger-text" type="button" id="calendarRemoveOldDataButton">Remove old data…</button>
+                </div>
+              </details>
+            </div>
+            <div class="special-task-tracker-area" id="specialTaskTrackerArea">
+              <span class="tracker-label">Completed</span>
+              <button class="display-switch special-task-tracker-toggle" id="specialTaskTrackerToggle" type="button" aria-label="Hide task counts" aria-pressed="true"></button>
+              <div class="special-task-tracker" id="specialTaskTracker" aria-label="Special task counts"></div>
             </div>
             <div class="weekday-row" id="weekdayRow"></div>
             <div class="calendar-grid" id="calendarGrid"></div>
+          </section>
+
+          <section class="card time-panel" id="timePanel" aria-label="Focus timer">
+            <header class="card-head time-panel-head">
+              <h2 class="time-panel-title">Focus</h2>
+              <div class="range-switch time-chart-mode-toggle" role="tablist" aria-label="Timer view">
+                <button class="range-button is-active" type="button" id="timeChartModeMergedButton" role="tab">Timer</button>
+                <button class="range-button" type="button" id="timeChartModeSequenceButton" role="tab">History</button>
+              </div>
+              <button class="icon-quiet-button time-panel-toggle" id="timePanelToggle" type="button" aria-label="Close timer">›</button>
+            </header>
+
+            <div class="timer-session" id="timerSession">
+              <div class="timer-ring" id="timerDisplay" data-status="idle">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <circle class="timer-ring-track" cx="60" cy="60" r="52" fill="none"></circle>
+                  <circle class="timer-ring-progress" id="timerRingProgress" cx="60" cy="60" r="52" fill="none" transform="rotate(-90 60 60)"></circle>
+                </svg>
+                <div class="timer-ring-center">
+                  <span class="timer-ring-task" id="timerRingTask"></span>
+                  <span class="timer-ring-time" id="timerTimeText" aria-hidden="true">00:00</span>
+                  <span class="timer-ring-sub" id="timerRingSub">Ready</span>
+                  <span class="sr-only" id="timerStatusText" aria-live="polite">Timer idle</span>
+                </div>
+              </div>
+
+              <div class="timer-length-row" aria-label="Session length">
+                <button class="timer-adjust-button" type="button" id="timerSubtractButton" aria-label="Subtract 5 minutes" title="−5 min">−</button>
+                <div class="timer-presets" id="timerPresets"></div>
+                <button class="timer-adjust-button" type="button" id="timerAddButton" aria-label="Add 5 minutes" title="+5 min">+</button>
+              </div>
+
+              <div class="timer-task-picker">
+                <span class="timer-field-label">Tracking</span>
+                <div class="timer-task-chips" id="timerTaskChips"></div>
+                <select class="sr-only" id="timerTaskSelect" aria-label="Task to track" tabindex="-1"></select>
+              </div>
+
+              <div class="timer-buttons">
+                <button class="primary-button timer-main-button" type="button" id="timerStartButton">Start</button>
+                <button class="primary-button timer-main-button" type="button" id="timerPauseButton" hidden>Pause</button>
+                <button class="ghost-button timer-main-button" type="button" id="timerStopButton" hidden>Stop</button>
+              </div>
+              <div class="timer-finished" id="timerFinishedControls" hidden>
+                <span>Time is up!</span>
+                <button class="ghost-button" type="button" id="timerContinueButton">Continue</button>
+                <button class="primary-button" type="button" id="timerEndButton">End</button>
+              </div>
+              <div class="timer-stop-confirm" id="timerStopConfirm" hidden>
+                <span>Save tracked time?</span>
+                <button class="primary-button" type="button" id="timerStopSaveButton">Save</button>
+                <button class="ghost-button" type="button" id="timerStopResumeButton">Keep going</button>
+                <button class="ghost-button danger-text" type="button" id="timerStopDiscardButton">Discard</button>
+              </div>
+            </div>
+
+            <div class="time-today" id="timeChartArea">
+              <div class="time-today-head">
+                <span class="timer-field-label" id="timeTodayLabel">Tracked</span>
+                <strong class="time-chart-total" id="timeChartTotal">0m</strong>
+                <button class="quiet-button time-clear-button" type="button" id="clearTimeEntriesButton" hidden>Clear</button>
+              </div>
+              <div class="time-bar" id="timeBar" role="img" aria-label="No time tracked"></div>
+              <div class="time-legend" id="timeLegend"></div>
+            </div>
+
+            <div class="time-sequence-list" id="timeSequenceList" hidden></div>
           </section>
         </div>
       </section>
@@ -290,7 +290,7 @@
           <button class="icon-button danger" type="button" data-action="delete-section" aria-label="Delete section">x</button>
         </header>
         <form class="goal-form">
-          <input type="text" placeholder="Add a goal and press Enter">
+          <input type="text" placeholder="Add a goal">
         </form>
         <ul class="goal-list"></ul>
       </article>
