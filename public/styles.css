@@ -3661,8 +3661,9 @@ textarea:focus-visible {
   background: transparent;
 }
 
-.calendar-task[draggable="true"] {
-  cursor: grab;
+.calendar-task {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .calendar-task .task-text-input:not(:focus) {
@@ -3670,11 +3671,26 @@ textarea:focus-visible {
 }
 
 .calendar-task .task-text-wrap {
-  cursor: text;
+  cursor: grab;
 }
 
-.calendar-task.is-special-calendar-task .task-text-wrap {
-  cursor: inherit;
+.calendar-task .task-text-wrap:active {
+  cursor: grabbing;
+}
+
+.task-drag-handle.is-static,
+.task-drag-handle.is-static:hover,
+.task-drag-handle.is-static:active {
+  width: 9px;
+  cursor: default;
+}
+
+.note-pill .task-drag-handle.is-static {
+  width: 6px;
+}
+
+.calendar-task input[type="checkbox"] {
+  cursor: pointer;
 }
 
 textarea.task-text-input {

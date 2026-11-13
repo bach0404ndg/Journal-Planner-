@@ -3302,8 +3302,22 @@ function makeTaskRow(note, dateKey, variant) {
 
 function enableTaskRowDrag(task, type, details, input) {
   task.draggable = true;
+  // The coloured strip and the checkbox form the "head" of the row: it is for
+  // ticking, not dragging. Dragging starts from the body of the task.
+  const strip = task.querySelector(":scope > .task-drag-handle");
+  if (strip) {
+    strip.draggable = false;
+    strip.tabIndex = -1;
+    strip.removeAttribute("title");
+    strip.removeAttribute("role");
+    strip.setAttribute("aria-hidden", "true");
+    strip.classList.add("is-static");
+  }
   task.addEventListener("pointerdown", (event) => {
-    const blocked = event.target.closest(".subtask-panel, .calendar-task-actions, input[type='checkbox']");
+    const checkbox = task.querySelector(":scope > input[type='checkbox']");
+    const headEnd = checkbox ? checkbox.getBoundingClientRect().right + 4 : 0;
+    const blocked = event.clientX <= headEnd
+      || event.target.closest(".subtask-panel, .calendar-task-actions, .task-drag-handle, input[type='checkbox']");
     task.draggable = !blocked && document.activeElement !== input;
   });
   task.addEventListener("dragstart", (event) => {
