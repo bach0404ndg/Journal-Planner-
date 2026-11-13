@@ -5113,8 +5113,8 @@ function renderGoalItem(section, goal) {
   text.addEventListener("input", () => {
     resizeWrappingTextboxSoon(text);
   });
-  // Lines behave like a document: Enter starts a new bullet, Backspace at the
-  // start joins with the line above, and the arrow keys move between lines.
+  // Enter finishes the line. Backspace at the start joins with the line above,
+  // and the arrow keys move between lines.
   let restructuring = false;
   const restructure = (label, change, focusGoalId, focusPosition) => {
     restructuring = true;
@@ -5152,25 +5152,7 @@ function renderGoalItem(section, goal) {
 
     if (event.key === "Enter") {
       event.preventDefault();
-      const before = text.value.slice(0, caretStart).trim();
-      const after = text.value.slice(caretEnd).trim();
-      if (!before && !after) {
-        text.blur();
-        return;
-      }
-      const newGoal = { id: makeId("goal"), text: "", done: false, dueDate: "", subtasks: [] };
-      if (before) {
-        newGoal.text = after;
-        restructure("goal edit", () => {
-          goal.text = before;
-          section.goals.splice(index + 1, 0, newGoal);
-        }, newGoal.id, 0);
-      } else {
-        restructure("goal edit", () => {
-          goal.text = after;
-          section.goals.splice(index, 0, newGoal);
-        }, goal.id, 0);
-      }
+      text.blur();
       return;
     }
 
