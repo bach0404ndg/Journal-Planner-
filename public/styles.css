@@ -3639,6 +3639,26 @@ textarea:focus-visible {
   opacity: 0.4;
 }
 
+.calendar-task.is-merge-target {
+  box-shadow: 0 0 0 2px var(--task-color, var(--green));
+}
+
+.mini-item.calendar-task.has-subtasks {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.note-pill.calendar-task.has-subtasks {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.calendar-task.has-subtasks .subtask-panel {
+  padding-left: 1px;
+}
+
+.calendar-task.has-subtasks > .task-text-wrap .task-text-input {
+  font-weight: 650;
+}
+
 .calendar-task input[type="checkbox"],
 .mini-item input[type="checkbox"] {
   width: 15px;

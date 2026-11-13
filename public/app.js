@@ -2835,6 +2835,7 @@ function moveDraggedCalendarTask(targetDateKey) {
 function clearCalendarTaskDrag() {
   state.draggingCalendarTask = null;
   document.querySelectorAll(".is-task-drop-target").forEach((item) => item.classList.remove("is-task-drop-target"));
+  document.querySelectorAll(".is-merge-target").forEach((item) => item.classList.remove("is-merge-target"));
   document.querySelectorAll(".is-task-dragging").forEach((item) => item.classList.remove("is-task-dragging"));
 }
 
@@ -3216,12 +3217,86 @@ function makeInfoDumpRow(task) {
   return item;
 }
 
+function canMergeDraggedTaskInto(targetNote) {
+  const dragging = state.draggingCalendarTask;
+  if (!dragging || dragging.type !== "calendar-task" || !targetNote.specialTaskId) return false;
+  if (dragging.noteId === targetNote.id) return false;
+  const source = (state.data.calendarNotes[dragging.dateKey] || []).find((note) => note.id === dragging.noteId);
+  return Boolean(source) && !source.specialTaskId;
+}
+
+function mergeTaskIntoSpecialTask(sourceDateKey, sourceId, targetDateKey, targetId) {
+  const sourceNotes = state.data.calendarNotes[sourceDateKey] || [];
+  const source = sourceNotes.find((note) => note.id === sourceId);
+  const target = (state.data.calendarNotes[targetDateKey] || []).find((note) => note.id === targetId);
+  if (!source || !target || source === target || source.specialTaskId || !target.specialTaskId) return;
+
+  queueUndo("task merge");
+  const subtask = { id: makeId("subtask"), text: source.text, done: Boolean(source.done) };
+  getSubtasks(target).push(subtask, ...getSubtasks(source).map((item) => ({ ...item })));
+  target.done = target.subtasks.every((item) => item.done);
+
+  const remainingNotes = sourceNotes.filter((note) => note.id !== sourceId);
+  if (remainingNotes.length) {
+    state.data.calendarNotes[sourceDateKey] = remainingNotes;
+  } else {
+    delete state.data.calendarNotes[sourceDateKey];
+  }
+
+  // Time already tracked on the merged task follows it as time on the new subtask.
+  const sameDay = sourceDateKey === targetDateKey;
+  const sourceEntries = state.data.timeEntries[sourceDateKey] || [];
+  const movingEntries = sourceEntries.filter((entry) => entry.taskId === sourceId);
+  if (movingEntries.length) {
+    const keptEntries = sourceEntries.filter((entry) => entry.taskId !== sourceId);
+    if (keptEntries.length) {
+      state.data.timeEntries[sourceDateKey] = keptEntries;
+    } else {
+      delete state.data.timeEntries[sourceDateKey];
+    }
+    state.data.timeEntries[targetDateKey] = [
+      ...(state.data.timeEntries[targetDateKey] || []),
+      ...movingEntries.map((entry) => ({
+        ...entry,
+        taskId: target.id,
+        taskText: target.text,
+        color: target.color,
+        subtaskId: entry.subtaskId || subtask.id,
+        subtaskText: entry.subtaskId ? entry.subtaskText : source.text,
+        startedAt: sameDay ? entry.startedAt : shiftIsoDateToDateKey(entry.startedAt, targetDateKey),
+        endedAt: sameDay ? entry.endedAt : shiftIsoDateToDateKey(entry.endedAt, targetDateKey),
+      })),
+    ].sort(compareTimeEntriesByClock);
+  }
+
+  if (state.timer.status !== "idle" && state.timer.dateKey === sourceDateKey && state.timer.taskId === sourceId) {
+    state.timer.dateKey = targetDateKey;
+    state.timer.taskId = target.id;
+    state.timer.taskText = target.text;
+    state.timer.color = target.color;
+    if (!state.timer.subtaskId) {
+      state.timer.subtaskId = subtask.id;
+      state.timer.subtaskText = source.text;
+    }
+    if (!sameDay) state.timer.sessionStartedAt = shiftIsoDateToDateKey(state.timer.sessionStartedAt, targetDateKey);
+    persistTimerState();
+  }
+
+  saveData();
+  renderCalendar();
+}
+
 function makeTaskRow(note, dateKey, variant) {
   const isSpecialCalendarTask = variant === "calendar" && Boolean(note.specialTaskId);
   const task = document.createElement("div");
   task.className = variant === "calendar" ? "note-pill calendar-task" : "mini-item calendar-task";
+  // Once a task has subtasks, the subtasks carry the tick boxes and the task
+  // counts as done when all of them are ticked.
+  const hasSubtasks = getSubtasks(note).length > 0;
+  const isDone = hasSubtasks ? note.subtasks.every((subtask) => subtask.done) : Boolean(note.done);
   task.classList.toggle("is-special-calendar-task", isSpecialCalendarTask);
-  task.classList.toggle("is-done", Boolean(note.done));
+  task.classList.toggle("has-subtasks", hasSubtasks);
+  task.classList.toggle("is-done", isDone);
   const color = getCalendarTaskColor(note.color);
   task.style.setProperty("--task-color", color.color);
   task.style.setProperty("--task-tint", color.tint);
@@ -3284,6 +3359,8 @@ function makeTaskRow(note, dateKey, variant) {
   });
 
   const handleSubtaskChange = () => {
+    const subtasks = getSubtasks(note);
+    if (subtasks.length) note.done = subtasks.every((subtask) => subtask.done);
     saveData();
     renderCalendar();
     renderSelectedDateNotes();
@@ -3293,8 +3370,33 @@ function makeTaskRow(note, dateKey, variant) {
   actions.className = "calendar-task-actions";
   actions.append(makeSubtaskAddButton(note, "calendar task", handleSubtaskChange), deleteButton);
 
-  task.append(checkbox, textWrap, actions);
+  if (!hasSubtasks) task.append(checkbox);
+  task.append(textWrap, actions);
   task.append(makeSubtaskPanel(note, "calendar task", handleSubtaskChange));
+
+  if (note.specialTaskId) {
+    // Dropping a plain task here turns it into a subtask of this special task.
+    task.addEventListener("dragover", (event) => {
+      if (!canMergeDraggedTaskInto(note)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = "move";
+      task.classList.add("is-merge-target");
+      task.closest(".day-cell")?.classList.remove("is-task-drop-target");
+    });
+    task.addEventListener("dragleave", (event) => {
+      if (task.contains(event.relatedTarget)) return;
+      task.classList.remove("is-merge-target");
+    });
+    task.addEventListener("drop", (event) => {
+      if (!canMergeDraggedTaskInto(note)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const dragging = state.draggingCalendarTask;
+      clearCalendarTaskDrag();
+      mergeTaskIntoSpecialTask(dragging.dateKey, dragging.noteId, dateKey, note.id);
+    });
+  }
   enableTaskRowDrag(task, "calendar-task", { dateKey, noteId: note.id, task }, input);
   resizeWrappingTextboxSoon(input);
   return task;
@@ -3426,6 +3528,7 @@ function makeSubtaskRow(parent, subtask, ownerLabel, afterChange) {
   input.className = "subtask-text-input";
   input.type = "text";
   input.value = subtask.text;
+  input.title = subtask.text;
   input.setAttribute("aria-label", "Edit mini task");
   const commitInput = () => {
     const nextText = input.value.trim();
