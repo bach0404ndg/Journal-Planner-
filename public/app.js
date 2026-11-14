@@ -4425,10 +4425,19 @@ function populateTaskSelectOptions(selectEl, includeNoTask) {
     return 0;
   }
 
+  // Only items that carry a tick box are trackable: a task without subtasks,
+  // or each subtask of a task that has them.
   tasks.forEach(function (note) {
-    selectEl.append(makeOption(note.id, note.text));
-    (note.subtasks || []).forEach(function (subtask) {
-      selectEl.append(makeOption(note.id + ":" + subtask.id, "— " + subtask.text));
+    var subtasks = (note.subtasks || []).filter(function (subtask) { return subtask.text; });
+    if (!(note.subtasks || []).length) {
+      selectEl.append(makeOption(note.id, note.text));
+      return;
+    }
+    subtasks.forEach(function (subtask) {
+      selectEl.append(makeOption(
+        note.id + ":" + subtask.id,
+        includeNoTask ? subtask.text : note.text + " — " + subtask.text,
+      ));
     });
   });
   return tasks.length;
@@ -4546,7 +4555,6 @@ function renderTimerTaskChips() {
     var chip = document.createElement("button");
     chip.type = "button";
     chip.className = "timer-task-chip";
-    chip.classList.toggle("is-subtask", Boolean(parts[1]));
     chip.classList.toggle("is-no-task", !option.value);
     chip.classList.toggle("is-active", option.value === els.timerTaskSelect.value);
     chip.style.setProperty("--task-color", color.color);
@@ -4559,7 +4567,7 @@ function renderTimerTaskChips() {
     var text = document.createElement("span");
     text.className = "timer-task-chip-text";
     text.textContent = option.textContent.replace(/^— /, "");
-    chip.title = text.textContent;
+    chip.title = parts[1] && note ? note.text + " — " + text.textContent : text.textContent;
     chip.append(dot, text);
     chip.addEventListener("click", function () {
       els.timerTaskSelect.value = option.value;
